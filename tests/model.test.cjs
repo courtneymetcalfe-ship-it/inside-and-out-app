@@ -1,0 +1,15 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const ts=require('typescript');
+const Module=require('node:module');
+const source=path.join(__dirname,'../src/lib/model.ts');
+const compiled=ts.transpileModule(fs.readFileSync(source,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const moduleUnderTest=new Module(source);moduleUnderTest._compile(compiled,source);const {model}=moduleUnderTest.exports;
+test('empty organiser contains no invented records',()=>assert.equal(model.empty().entries.length,0));
+test('sample is explicitly marked and round-trips',()=>{const s=model.sample();assert.equal(s.demo,true);assert.deepEqual(model.parse(JSON.stringify(s)),s);});
+test('calendar validation rejects impossible dates, accepts leap day',()=>{const e={...model.blank(),title:'Appointment'};assert.notEqual(model.validate({...e,date:'2026-02-29'}),'');assert.equal(model.validate({...e,date:'2028-02-29'}),'');assert.notEqual(model.validate({...e,time:'24:00'}),'');assert.notEqual(model.validate({...e,time:'12:60'}),'');});
+test('invalid and duplicate records cannot load as a valid backup',()=>{assert.throws(()=>model.parse('{}'));const s=model.sample();s.entries.push({...s.entries[0]});assert.throws(()=>model.parse(JSON.stringify(s)));});
+test('next court excludes past or completed records and sorts ascending',()=>{const s=model.empty();s.entries=[{...model.blank('Court'),title:'Later',date:'2099-12-01'},{...model.blank('Court'),title:'Earlier',date:'2099-01-01'},{...model.blank('Court'),title:'Done',date:'2098-01-01',status:'Completed'},{...model.blank('Court'),title:'Past',date:'2000-01-01'}];assert.equal(model.next(s,'Court').title,'Earlier');});
+test('timeline sort does not mutate stored order',()=>{const s=model.sample();s.entries[0].date='2000-01-01';s.entries[1].date='2099-01-01';const first=s.entries[0].id;assert.equal(model.sort(s.entries)[0].id,s.entries[1].id);assert.equal(s.entries[0].id,first);});
