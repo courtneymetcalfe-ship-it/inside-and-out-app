@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Inside & Out",
+    "slug": "inside-and-out",
+    "owner": "courtneymetcalfes-team",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "insideandout",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "au.com.insideandout.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to protect sensitive information stored in Inside & Out.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "au.com.insideandout.app",
+      "versionCode": 1
+    },
+    "plugins": [
+      "expo-router",
+      "expo-document-picker",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow Inside & Out to use Face ID to protect private information."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Inside & Out to use Face ID to unlock the app."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "https://inside-and-out-production.up.railway.app",
+      "eas": {
+        "projectId": "25168db7-3195-4e64-8ff5-13b4382265e9"
+      }
+    },
+    "description": "A family support organiser for keeping court, medical, visit, call and document information together in one place.",
+    "primaryColor": "#315A4A"
+  }
+}
