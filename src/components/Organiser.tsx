@@ -1,10 +1,31 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {Image,ImageBackground,Pressable,StyleSheet,Text,View} from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {model} from '../lib/model';
 import {platform} from '../lib/platform';
 import {Action,Box,Field,Label,Picker,Shell,Sheet} from './Surface';
+import BottomNav from './BottomNav';
 type Entry=ReturnType<typeof model.blank>;
 type State=ReturnType<typeof model.empty>;
-const categories=[['Court','⚖','Court & Legal'],['Medical','♥','Medical & Safety'],['Visit','♟','Visits'],['Timeline','◷','Timeline'],['Document','▣','Documents'],['Help','?','Get Help']];
+const categories=[
+  {page:'Court',icon:'gavel',label:'Court & Legal',tint:'#E8F3F1'},
+  {page:'Medical',icon:'heart-pulse',label:'Medical & Safety',tint:'#F5EDE3'},
+  {page:'Visit',icon:'account-clock-outline',label:'Visits',tint:'#E8F3F1'},
+  {page:'Timeline',icon:'timeline-clock-outline',label:'Timeline',tint:'#E8F3F1'},
+  {page:'Document',icon:'file-document-outline',label:'Documents',tint:'#F5EDE3'},
+  {page:'Help',icon:'lifebuoy',label:'Get Help',tint:'#E8F3F1'},
+] as const;
+const pageTitles:Record<string,string>={Court:'Court & Legal',Medical:'Medical & Safety',Visit:'Visits',Timeline:'Timeline',Document:'Documents',Help:'Get Help',Call:'Calls & Follow-ups',More:'More'};
+function displayName(value:string){return value.trim().replace(/\b\w/g,c=>c.toUpperCase());}
+function formatDate(date?:string,time?:string){
+  if(!date)return '';
+  const parts=date.split('-').map(Number); if(parts.length!==3||parts.some(Number.isNaN))return [date,time].filter(Boolean).join(' · ');
+  const d=new Date(parts[0],parts[1]-1,parts[2]);
+  const day=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  if(!time)return day;
+  const [h,m]=time.split(':').map(Number); const clock=new Date(2000,0,1,h||0,m||0).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}).toLowerCase();
+  return `${day} · ${clock}`;
+}
 const topicNotes:Record<string,string>={
   'Medical treatment':'Record the concern, when it started, who you contacted and their response. Use Medical & Safety to keep the follow-up together.',
   'Court / bail':'Keep hearing notices, dates, matter numbers and solicitor details together. Confirm dates and advice directly with your legal representative.',
@@ -34,17 +55,38 @@ export default function Organiser({initialPage='Home'}:{initialPage?:string}) {
   const visible=entries.filter(e=>(page==='Timeline'||e.kind===page)&&(filter==='All'||e.kind===filter||e.status===filter)&&`${e.title} ${e.place} ${e.details}`.toLowerCase().includes(search.toLowerCase()));
   const issues=entries.filter(e=>['Follow up','Missing','Not confirmed'].includes(e.status));
   const court=model.next(state,'Court');const visit=model.next(state,'Visit');
-  const nav=<Box variant="navBar">{[['Home','⌂'],['Timeline','◷'],['Add','＋'],['Call','☎'],['More','•••']].map(([p,icon])=><Action key={p} disabled={!ready||busy} tone={page===p?'selected':'nav'} onPress={()=>p==='Add'?add('Note'):go(p)}>{icon}{'\n'}{p==='Call'?'Calls':p}</Action>)}</Box>;
+  const nav=<BottomNav active={page} onSelect={p=>p==='Add'?add('Note'):go(p)}/>;
   if(!ready)return <Shell nav={null}><Label variant="title">Inside & Out</Label><Label>{error||'Loading your organiser…'}</Label></Shell>;
   return <Shell nav={nav}>
-    <Box variant="row"><Box><Label variant="title">{page==='Home'?'Inside & Out':categories.find(c=>c[0]===page)?.[2]|| (page==='Call'?'Calls & Follow-ups':page)}</Label><Label variant="accent">{page==='Home'?'Support that stays with you.':'Your family organiser'}</Label></Box>{page!=='Home'&&<Action tone="quiet" onPress={()=>go('Home')}>Home</Action>}</Box>
+    <View style={ui.header}>
+      <View style={ui.brandRow}>
+        <Image source={require('../../assets/inside-out-door.png')} style={ui.logo}/>
+        <View style={ui.brandCopy}><Text style={ui.brand}>{page==='Home'?'Inside & Out':pageTitles[page]||page}</Text><Text style={ui.tagline}>{page==='Home'?'Organise · Stay informed · Feel supported':'Your family organiser'}</Text></View>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Profile settings" style={ui.profileButton} onPress={()=>setProfile({...state.profile})}><MaterialCommunityIcons name="cog-outline" size={22} color="#174F4B"/></Pressable>
+    </View>
     {state.demo&&<Box variant="alert"><Label variant="badge">SAMPLE DATA</Label><Label variant="small">These are fictional examples. Clear sample data in More before adding personal records.</Label></Box>}
     {!!error&&<Label variant="error">{error}</Label>}{!!notice&&<Label variant="accent">{notice}</Label>}
     {page==='Home'&&<>
-      <Box variant="hero"><Label variant="heading">{state.profile.name||'Your support circle starts here'}</Label><Label variant="small">{state.profile.min?`MIN: ${state.profile.min}`:'Add a name and optional MIN'}</Label><Label>{state.profile.location||'Keep important details together.'}</Label><Action tone="quiet" onPress={()=>setProfile({...state.profile})}>Edit profile</Action></Box>
+      <ImageBackground source={require('../../assets/inside-out-mountains.png')} imageStyle={ui.welcomeImage} style={ui.welcome}>
+        <View style={ui.welcomeCopy}><Text style={ui.eyebrow}>YOUR ORGANISER</Text><Text style={ui.welcomeTitle}>{state.profile.name?`Good morning, ${displayName(state.profile.name).split(' ')[0]}`:'A clearer path forward'}</Text><Text style={ui.quote}>Small steps keep bigger futures possible.</Text></View>
+      </ImageBackground>
+      <Pressable accessibilityRole="button" onPress={()=>setProfile({...state.profile})} style={ui.profileStrip}>
+        <View style={ui.avatar}><Text style={ui.avatarText}>{state.profile.name?displayName(state.profile.name).split(' ').map(n=>n[0]).join('').slice(0,2):'IO'}</Text></View>
+        <View style={ui.profileCopy}><Text style={ui.profileName}>{state.profile.name?displayName(state.profile.name):'Add a profile'}</Text><Text numberOfLines={1} style={ui.profileMeta}>{[state.profile.min&&`MIN ${state.profile.min}`,state.profile.location?.trim()].filter(Boolean).join('  •  ')||'Keep key details together'}</Text></View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color="#60727E"/>
+      </Pressable>
       {issues.length>0&&<Box variant="alert"><Label variant="badge">NEEDS FOLLOW-UP · {issues.length}</Label><Label variant="heading">{issues[0].title}</Label><Label variant="small">{issues[0].date} · {issues[0].status}</Label><Action tone="quiet" onPress={()=>{go(issues[0].kind);setEdit({...issues[0]});}}>View record</Action></Box>}
-      <Box variant="card">{[['Next court date',court?`${court.date} ${court.time}`:'No upcoming date','Court'],['Next visit',visit?`${visit.date} ${visit.time}`:'No upcoming visit','Visit'],['Open follow-ups',String(issues.length),'Timeline'],['Documents',String(entries.filter(e=>e.kind==='Document').length),'Document'],['Last call',entries.find(e=>e.kind==='Call')?.date||'No calls recorded','Call']].map(([label,value,p])=><Box variant="row" key={label}><Box><Label variant="small">{label}</Label><Label variant="heading">{value}</Label></Box><Action tone="quiet" onPress={()=>go(p)}>View</Action></Box>)}</Box>
-      <Box variant="grid">{categories.map(([p,icon,label])=><Action key={p} tone="tile" onPress={()=>go(p)}>{icon}{'\n'}{label}</Action>)}</Box>
+      <View style={ui.sectionHead}><Text style={ui.sectionTitle}>Everything you need</Text><Text style={ui.sectionHint}>All in one place</Text></View>
+      <View style={ui.tileGrid}>{categories.map(item=><Pressable accessibilityRole="button" key={item.page} onPress={()=>go(item.page)} style={[ui.tile,{backgroundColor:item.tint}]}><View style={ui.tileIcon}><MaterialCommunityIcons name={item.icon as any} size={27} color="#174F4B"/></View><Text style={ui.tileLabel}>{item.label}</Text><Text style={ui.tileHint}>{item.page==='Document'?`${entries.filter(e=>e.kind==='Document').length} saved`:item.page==='Timeline'?`${entries.length} records`:'Open'}</Text></Pressable>)}</View>
+      <View style={ui.sectionHead}><Text style={ui.sectionTitle}>Upcoming</Text><Pressable onPress={()=>go('Timeline')}><Text style={ui.seeAll}>See all</Text></Pressable></View>
+      <View style={ui.upcomingCard}>
+        {[
+          {label:'Court date',value:court?formatDate(court.date,court.time):'No upcoming date',page:'Court',icon:'gavel'},
+          {label:'Next visit',value:visit?formatDate(visit.date,visit.time):'No upcoming visit',page:'Visit',icon:'account-clock-outline'},
+          {label:'Follow-ups',value:issues.length?`${issues.length} item${issues.length===1?'':'s'} need attention`:'You’re up to date',page:'Timeline',icon:'check-circle-outline'}
+        ].map((item,index)=><Pressable accessibilityRole="button" key={item.label} onPress={()=>go(item.page)} style={[ui.upcomingRow,index>0&&ui.upcomingBorder]}><View style={ui.upcomingIcon}><MaterialCommunityIcons name={item.icon as any} size={21} color="#218A84"/></View><View style={ui.upcomingCopy}><Text style={ui.upcomingLabel}>{item.label}</Text><Text style={ui.upcomingValue}>{item.value}</Text></View><MaterialCommunityIcons name="chevron-right" size={22} color="#7B8B91"/></Pressable>)}
+      </View>
       {!entries.length&&!state.profile.name&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{await commit(model.sample());})}>Explore sample records</Action>}
     </>}
     {(model.kinds.includes(page)||page==='Timeline')&&<>
@@ -55,7 +97,7 @@ export default function Organiser({initialPage='Home'}:{initialPage?:string}) {
       <Field label="Search records" value={search} onChange={setSearch} placeholder="Title, location or notes"/>
       <Box variant="grid">{(page==='Timeline'?['All',...model.kinds]:['All','Follow up','Completed']).map(t=><Action key={t} tone={filter===t?'selected':'quiet'} onPress={()=>setFilter(t)}>{t}</Action>)}</Box>
       {visible.length===0&&<Box variant="card"><Label variant="heading">{entries.some(e=>page==='Timeline'||e.kind===page)?'No matching records':'Nothing saved yet'}</Label><Label variant="small">{search?'Try another search.':'Add a record to begin. Your saved entries will appear here.'}</Label></Box>}
-      {visible.map(e=><Box variant="card" key={e.id}><Label variant="badge">{e.kind} · {e.status}</Label><Label variant="heading">{e.title}</Label><Label variant="small">{e.date}{e.time?' · '+e.time:''}{e.place?' · '+e.place:''}</Label>{!!e.details&&<Label>{e.details}</Label>}<Box variant="row"><Action tone="quiet" disabled={busy} onPress={()=>{setError('');setEdit({...e});}}>Edit</Action>{e.attachment&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{await platform.open(e.attachment!);})}>Open / share</Action>}<Action tone="quiet" disabled={busy} onPress={()=>setConfirm(e)}>Delete</Action></Box>{platform.native&&e.kind!=='Document'&&e.status!=='Completed'&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{if(e.reminderId){await platform.cancelReminder(e.reminderId);await commit({...current.current,entries:current.current.entries.map(x=>x.id===e.id?{...x,reminderId:undefined}:x)});setNotice('Reminder cancelled.');}else{const id=await platform.remind(e);try{await commit({...current.current,entries:current.current.entries.map(x=>x.id===e.id?{...x,reminderId:id}:x)});}catch(error){await platform.cancelReminder(id);throw error;}setNotice('Reminder scheduled for '+e.date+' '+(e.time||'09:00')+'.');}})}>{e.reminderId?'Cancel reminder':'Remind me at this time'}</Action>}</Box>)}
+      {visible.map(e=><Box variant="card" key={e.id}><Label variant="badge">{e.kind} · {e.status}</Label><Label variant="heading">{e.title}</Label><Label variant="small">{formatDate(e.date,e.time)}{e.place?' · '+e.place:''}</Label>{!!e.details&&<Label>{e.details}</Label>}<Box variant="row"><Action tone="quiet" disabled={busy} onPress={()=>{setError('');setEdit({...e});}}>Edit</Action>{e.attachment&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{await platform.open(e.attachment!);})}>Open / share</Action>}<Action tone="quiet" disabled={busy} onPress={()=>setConfirm(e)}>Delete</Action></Box>{platform.native&&e.kind!=='Document'&&e.status!=='Completed'&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{if(e.reminderId){await platform.cancelReminder(e.reminderId);await commit({...current.current,entries:current.current.entries.map(x=>x.id===e.id?{...x,reminderId:undefined}:x)});setNotice('Reminder cancelled.');}else{const id=await platform.remind(e);try{await commit({...current.current,entries:current.current.entries.map(x=>x.id===e.id?{...x,reminderId:id}:x)});}catch(error){await platform.cancelReminder(id);throw error;}setNotice('Reminder scheduled for '+formatDate(e.date,e.time)+'.');}})}>{e.reminderId?'Cancel reminder':'Remind me at this time'}</Action>}</Box>)}
       {page==='Timeline'&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{await platform.export({...state,entries:visible});})}>Export displayed timeline</Action>}
     </>}
     {page==='Help'&&<><Label variant="heading">What do you need help with?</Label><Box variant="grid">{Object.keys(topicNotes).map(t=><Action key={t} tone="tile" onPress={()=>setTopic(t)}>{t}</Action>)}</Box><Box variant="card"><Label variant="heading">Keep a clear record</Label><Label>Save dates, documents and the outcome of each call so your next conversation is easier.</Label><Action tone="teal" onPress={()=>{go('Note');add('Note');}}>Write a note</Action></Box></>}
@@ -67,3 +109,11 @@ export default function Organiser({initialPage='Home'}:{initialPage?:string}) {
     <Sheet open={!!topic} title={topic||'Help'} onClose={()=>setTopic('')}><Label>{topicNotes[topic]}</Label><Action onPress={()=>{setTopic('');go('Note');add('Note');}}>Add a note</Action></Sheet>
   </Shell>;
 }
+
+const ui=StyleSheet.create({
+  header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},brandRow:{flexDirection:'row',alignItems:'center',gap:11,flex:1},logo:{width:48,height:48,borderRadius:14},brandCopy:{flex:1},brand:{fontFamily:'Georgia',fontSize:27,fontWeight:'700',color:'#173A54',letterSpacing:-.5},tagline:{marginTop:2,fontSize:10.5,fontWeight:'800',letterSpacing:.45,textTransform:'uppercase',color:'#60727E'},profileButton:{width:43,height:43,borderRadius:22,backgroundColor:'#E8F3F1',alignItems:'center',justifyContent:'center'},
+  welcome:{minHeight:145,borderRadius:25,padding:21,backgroundColor:'#E8F1EC',justifyContent:'center',overflow:'hidden'},welcomeImage:{borderRadius:25,opacity:.68},welcomeCopy:{width:'82%'},eyebrow:{fontSize:10.5,fontWeight:'900',letterSpacing:1.4,color:'#59766C'},welcomeTitle:{fontFamily:'Georgia',fontSize:27,lineHeight:32,fontWeight:'700',color:'#173A54',marginTop:6},quote:{fontFamily:'Georgia',fontStyle:'italic',fontSize:14,lineHeight:20,color:'#536A70',marginTop:8},
+  profileStrip:{backgroundColor:'#FFFEFB',borderWidth:1,borderColor:'#E1E8E7',borderRadius:19,padding:13,flexDirection:'row',alignItems:'center',gap:12},avatar:{width:42,height:42,borderRadius:21,backgroundColor:'#174F4B',alignItems:'center',justifyContent:'center'},avatarText:{color:'#fff',fontWeight:'900',fontSize:13},profileCopy:{flex:1},profileName:{fontSize:15.5,fontWeight:'900',color:'#173A54'},profileMeta:{fontSize:12.5,color:'#60727E',marginTop:3},
+  sectionHead:{flexDirection:'row',alignItems:'baseline',justifyContent:'space-between',marginTop:2},sectionTitle:{fontFamily:'Georgia',fontSize:21,fontWeight:'700',color:'#173A54'},sectionHint:{fontSize:12,color:'#71828A'},seeAll:{fontSize:13,fontWeight:'800',color:'#218A84'},tileGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},tile:{width:'31%',minHeight:116,borderRadius:19,paddingHorizontal:10,paddingVertical:13,alignItems:'center',justifyContent:'center'},tileIcon:{width:42,height:42,borderRadius:21,backgroundColor:'rgba(255,255,255,.65)',alignItems:'center',justifyContent:'center',marginBottom:8},tileLabel:{fontSize:13,fontWeight:'900',lineHeight:16,color:'#173A54',textAlign:'center'},tileHint:{fontSize:10.5,color:'#6C7C82',marginTop:4},
+  upcomingCard:{backgroundColor:'#FFFEFB',borderWidth:1,borderColor:'#E1E8E7',borderRadius:22,paddingHorizontal:15},upcomingRow:{flexDirection:'row',alignItems:'center',paddingVertical:14,gap:11},upcomingBorder:{borderTopWidth:1,borderTopColor:'#E7ECEA'},upcomingIcon:{width:38,height:38,borderRadius:12,backgroundColor:'#E6F4F2',alignItems:'center',justifyContent:'center'},upcomingCopy:{flex:1},upcomingLabel:{fontSize:11.5,color:'#647680',fontWeight:'700'},upcomingValue:{fontSize:14.5,lineHeight:20,color:'#173A54',fontWeight:'800',marginTop:2}
+});

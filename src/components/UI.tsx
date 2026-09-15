@@ -2,11 +2,11 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export const colors={
-  navy:'#17364D', navy2:'#102E43', teal:'#2A9D9A', aqua:'#DDF5F2',
+  navy:'#173A54', navy2:'#102E43', teal:'#174F4B', aqua:'#D9F3F1',
   blue:'#4B8DC6', purple:'#8F7AC8', purpleSoft:'#F1ECFB', green:'#63A979',
   greenSoft:'#EAF6EE', red:'#D95F70', danger:'#D95F70', redSoft:'#FDECEF', orange:'#E6A44D',
   orangeSoft:'#FFF4E5', ink:'#183143', muted:'#6F7D87', line:'#E7ECEF',
-  bg:'#FFFFFF', soft:'#F8FAFB'
+  bg:'#FAF8F3', soft:'#F2F5F3'
 };
 export function Card({children,style}:{children:React.ReactNode;style?:any}) { return <View style={[s.card,style]}>{children}</View>; }
 export function H2({children}:{children:React.ReactNode}) { return <Text style={s.h2}>{children}</Text>; }

@@ -4,6 +4,7 @@
     "slug": "inside-and-out",
     "owner": "courtneymetcalfes-team",
     "version": "1.0.0",
+    "icon": "./assets/inside-out-door.png",
     "orientation": "portrait",
     "scheme": "insideandout",
     "userInterfaceStyle": "light",
@@ -53,6 +54,6 @@
       }
     },
     "description": "A family support organiser for keeping court, medical, visit, call and document information together in one place.",
-    "primaryColor": "#315A4A"
+    "primaryColor": "#174F4B"
   }
 }

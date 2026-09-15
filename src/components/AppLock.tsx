@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { colors } from './UI';
 import { hasPasscode, isLockEnabled, setPasscode, verifyPasscode } from '../lib/secure';
@@ -7,6 +7,7 @@ import { hasPasscode, isLockEnabled, setPasscode, verifyPasscode } from '../lib/
 type Props = { children: React.ReactNode };
 
 export default function AppLock({ children }: Props) {
+  if(Platform.OS==='web')return <>{children}</>;
   const [ready, setReady] = useState(false);
   const [locked, setLocked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -80,7 +81,7 @@ export default function AppLock({ children }: Props) {
   if (!needsSetup && !locked) return <>{children}</>;
 
   return <View style={s.page}>
-    <View style={s.logo}><Text style={s.logoText}>I&O</Text></View>
+    <Image source={require('../../assets/inside-out-door.png')} style={s.logo}/>
     <Text style={s.title}>Inside & Out</Text>
     <Text style={s.subtitle}>{needsSetup ? 'Protect private family information with an app passcode.' : 'Unlock to continue.'}</Text>
     <TextInput
@@ -104,8 +105,8 @@ export default function AppLock({ children }: Props) {
 const s = StyleSheet.create({
   page:{flex:1,backgroundColor:colors.soft,justifyContent:'center',padding:28},
   center:{flex:1,justifyContent:'center',alignItems:'center'},
-  logo:{width:74,height:74,borderRadius:22,backgroundColor:colors.navy,alignSelf:'center',alignItems:'center',justifyContent:'center',marginBottom:18},
-  logoText:{color:'#fff',fontSize:24,fontWeight:'900'},title:{fontSize:30,fontWeight:'900',textAlign:'center',color:colors.navy},
+  logo:{width:74,height:74,borderRadius:22,alignSelf:'center',marginBottom:18},
+  title:{fontFamily:'Georgia',fontSize:30,fontWeight:'700',textAlign:'center',color:colors.navy},
   subtitle:{fontSize:15,lineHeight:22,textAlign:'center',color:colors.muted,marginTop:8,marginBottom:24},
   input:{backgroundColor:'#fff',borderWidth:1,borderColor:colors.line,borderRadius:14,padding:15,fontSize:20,textAlign:'center',letterSpacing:8},
   error:{color:colors.danger,textAlign:'center',marginTop:8},
