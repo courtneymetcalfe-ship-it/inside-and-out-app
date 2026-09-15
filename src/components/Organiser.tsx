@@ -11,11 +11,11 @@ const categories=[
   {page:'Court',icon:'gavel',label:'Court & Legal',tint:'#E8F3F1'},
   {page:'Medical',icon:'heart-pulse',label:'Medical & Safety',tint:'#F5EDE3'},
   {page:'Visit',icon:'account-clock-outline',label:'Visits',tint:'#E8F3F1'},
-  {page:'Timeline',icon:'timeline-clock-outline',label:'Timeline',tint:'#E8F3F1'},
+  {page:'Task',icon:'clipboard-check-outline',label:'Tasks',tint:'#E8F3F1'},
   {page:'Document',icon:'file-document-outline',label:'Documents',tint:'#F5EDE3'},
   {page:'Help',icon:'lifebuoy',label:'Get Help',tint:'#E8F3F1'},
 ] as const;
-const pageTitles:Record<string,string>={Court:'Court & Legal',Medical:'Medical & Safety',Visit:'Visits',Timeline:'Timeline',Document:'Documents',Help:'Get Help',Call:'Calls & Follow-ups',More:'More'};
+const pageTitles:Record<string,string>={Court:'Court & Legal',Medical:'Medical & Safety',Visit:'Visits',Task:'Tasks',Timeline:'Timeline',Document:'Documents',Help:'Get Help',Call:'Calls & Follow-ups',More:'More'};
 function displayName(value:string){return value.trim().replace(/\b\w/g,c=>c.toUpperCase());}
 function formatDate(date?:string,time?:string){
   if(!date)return '';
@@ -78,7 +78,7 @@ export default function Organiser({initialPage='Home'}:{initialPage?:string}) {
       </Pressable>
       {issues.length>0&&<Box variant="alert"><Label variant="badge">NEEDS FOLLOW-UP · {issues.length}</Label><Label variant="heading">{issues[0].title}</Label><Label variant="small">{issues[0].date} · {issues[0].status}</Label><Action tone="quiet" onPress={()=>{go(issues[0].kind);setEdit({...issues[0]});}}>View record</Action></Box>}
       <View style={ui.sectionHead}><Text style={ui.sectionTitle}>Everything you need</Text><Text style={ui.sectionHint}>All in one place</Text></View>
-      <View style={ui.tileGrid}>{categories.map(item=><Pressable accessibilityRole="button" key={item.page} onPress={()=>go(item.page)} style={[ui.tile,{backgroundColor:item.tint}]}><View style={ui.tileIcon}><MaterialCommunityIcons name={item.icon as any} size={27} color="#174F4B"/></View><Text style={ui.tileLabel}>{item.label}</Text><Text style={ui.tileHint}>{item.page==='Document'?`${entries.filter(e=>e.kind==='Document').length} saved`:item.page==='Timeline'?`${entries.length} records`:'Open'}</Text></Pressable>)}</View>
+      <View style={ui.tileGrid}>{categories.map(item=><Pressable accessibilityRole="button" key={item.page} onPress={()=>go(item.page)} style={[ui.tile,{backgroundColor:item.tint}]}><View style={ui.tileIcon}><MaterialCommunityIcons name={item.icon as any} size={27} color="#174F4B"/></View><Text style={ui.tileLabel}>{item.label}</Text><Text style={ui.tileHint}>{item.page==='Document'?`${entries.filter(e=>e.kind==='Document').length} saved`:item.page==='Task'?`${entries.filter(e=>e.kind==='Task'&&e.status!=='Completed').length} open`:'Open'}</Text></Pressable>)}</View>
       <View style={ui.sectionHead}><Text style={ui.sectionTitle}>Upcoming</Text><Pressable onPress={()=>go('Timeline')}><Text style={ui.seeAll}>See all</Text></Pressable></View>
       <View style={ui.upcomingCard}>
         {[
@@ -90,10 +90,11 @@ export default function Organiser({initialPage='Home'}:{initialPage?:string}) {
       {!entries.length&&!state.profile.name&&<Action tone="quiet" disabled={busy} onPress={()=>work(async()=>{await commit(model.sample());})}>Explore sample records</Action>}
     </>}
     {(model.kinds.includes(page)||page==='Timeline')&&<>
+      {page==='Task'&&<Label variant="small">Keep important follow-ups and things to do together. Mark each task completed when it is finished.</Label>}
       {page==='Medical'&&<Label variant="small">Record medications, conditions and incidents. Notes are not sent to a clinician or emergency service.</Label>}
       {page==='Court'&&<Label variant="small">Keep matter numbers, charges as entered, solicitor details and bail preparation notes with each court record.</Label>}
       {page==='Visit'&&<Label variant="small">Keep visitor names, approval status, booking references and transport notes together. Adding a record does not book a visit.</Label>}
-      {page==='Document'?<><Label variant="small">Copies stay on this device or browser. JSON exports contain record metadata, not the document files. Keep original documents separately.</Label>{platform.native?<Action disabled={busy} onPress={()=>platform.pick().then(attach).catch(e=>setError(e.message))}>Choose documents</Action>:<Picker disabled={busy} onPick={attach}/>}</>:<Action tone={page==='Medical'?'danger':'teal'} disabled={busy} onPress={()=>add()}>+ {page==='Medical'?'Add medication, condition or incident':page==='Timeline'?'Add event':'Add record'}</Action>}
+      {page==='Document'?<><Label variant="small">Copies stay on this device or browser. JSON exports contain record metadata, not the document files. Keep original documents separately.</Label>{platform.native?<Action disabled={busy} onPress={()=>platform.pick().then(attach).catch(e=>setError(e.message))}>Choose documents</Action>:<Picker disabled={busy} onPick={attach}/>}</>:<Action tone={page==='Medical'?'danger':'teal'} disabled={busy} onPress={()=>add()}>+ {page==='Medical'?'Add medication, condition or incident':page==='Timeline'?'Add event':page==='Task'?'Add task':'Add record'}</Action>}
       <Field label="Search records" value={search} onChange={setSearch} placeholder="Title, location or notes"/>
       <Box variant="grid">{(page==='Timeline'?['All',...model.kinds]:['All','Follow up','Completed']).map(t=><Action key={t} tone={filter===t?'selected':'quiet'} onPress={()=>setFilter(t)}>{t}</Action>)}</Box>
       {visible.length===0&&<Box variant="card"><Label variant="heading">{entries.some(e=>page==='Timeline'||e.kind===page)?'No matching records':'Nothing saved yet'}</Label><Label variant="small">{search?'Try another search.':'Add a record to begin. Your saved entries will appear here.'}</Label></Box>}

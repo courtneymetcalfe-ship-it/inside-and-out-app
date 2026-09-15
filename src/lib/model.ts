@@ -1,6 +1,6 @@
 type Entry = { id:string; kind:string; title:string; date:string; time:string; place:string; details:string; status:string; attachment?:string; reminderId?:string };
 type State = { version:1; demo:boolean; profile:{name:string; min:string; location:string}; entries:Entry[] };
-const kinds = ['Court','Medical','Visit','Call','Note','Document'];
+const kinds = ['Court','Medical','Visit','Call','Note','Task','Document'];
 const statuses = ['Planned','Follow up','Completed','Receiving','Not confirmed','Missing'];
 const empty = ():State => ({version:1,demo:false,profile:{name:'',min:'',location:''},entries:[]});
 const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
