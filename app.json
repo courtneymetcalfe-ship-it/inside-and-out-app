@@ -37,6 +37,7 @@
           "faceIDPermission": "Allow Inside & Out to use Face ID to unlock the app."
         }
       ],
+      "./plugins/with-local-notifications-only",
       [
         "expo-notifications",
         {
