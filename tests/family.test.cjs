@@ -1,0 +1,41 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {PGlite}=require('@electric-sql/pglite');
+const migration=fs.readFileSync('supabase/migrations/202609160001_family.sql','utf8');
+const A='10000000-0000-0000-0000-000000000001',B='10000000-0000-0000-0000-000000000002',C='10000000-0000-0000-0000-000000000003';
+const state={version:1,demo:false,profile:{name:'Test inmate',min:'',location:''},entries:[{id:'task-1',kind:'Task',title:'Call solicitor',date:'2026-09-16',time:'',place:'',details:'',status:'Planned'}]};
+test('database enforces one admin, isolated inmate access, invitations, task updates and revocation',async()=>{
+ const db=new PGlite();
+ await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
+ await db.query('insert into auth.users values ($1,$2,now()),($3,$4,now()),($5,$6,now())',[A,'admin@example.test',B,'family@example.test',C,'stranger@example.test']);
+ await db.exec(migration);
+ async function as(id){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role authenticated');}
+ async function call(fn,args=[],placeholders=args.map((_,i)=>'$'+(i+1)).join(',')){return (await db.query(`select public.${fn}(${placeholders}) as result`,args)).rows[0].result;}
+ await as(A);const inmate=await call('io_create',[state]);
+ assert.equal((await db.query('select admin_id from io_inmates')).rows[0].admin_id,A);
+ await assert.rejects(()=>db.query('update io_inmates set admin_id=$1 where id=$2',[B,inmate]),/permission denied/);
+ await as(C);assert.equal((await db.query('select * from io_inmates')).rows.length,0);
+ await assert.rejects(()=>call('io_read',[inmate]),/access/i);
+ await assert.rejects(()=>call('io_invite',[inmate,'stranger@example.test']),/admin/);
+ await as(A);await call('io_invite',[inmate,'family@example.test']);
+ await as(B);let invites=await call('io_invitations');assert.equal(invites.length,1);
+ await as(C);await assert.rejects(()=>call('io_accept',[invites[0].id]),/belongs/);
+ await as(B);await call('io_accept',[invites[0].id]);assert.equal((await call('io_read',[inmate])).state.entries.length,1);
+ await assert.rejects(()=>call('io_save',[inmate,0,state]),/admin/);
+ await assert.rejects(()=>call('io_remove_member',[inmate,A]),/admin/);
+ await call('io_task_status',[inmate,'task-1',true,0]);
+ let shared=await call('io_read',[inmate]);assert.equal(shared.state.entries[0].status,'Completed');assert.equal(shared.state.entries[0].updatedBy,'family@example.test');
+ await assert.rejects(()=>call('io_task_status',[inmate,'task-1',false,0]),/Another family member/);
+ await as(A);await assert.rejects(()=>call('io_save',[inmate,0,state]),/Another family member/);
+ await assert.rejects(()=>call('io_remove_member',[inmate,A]),/sole admin/);
+ await assert.rejects(()=>call('io_log',[inmate,'Forged event']),/permission denied/);
+ await call('io_remove_member',[inmate,B]);
+ await as(B);await assert.rejects(()=>call('io_read',[inmate]),/access/i);await assert.rejects(()=>call('io_task_status',[inmate,'task-1',false,1]),/Access denied/);
+ assert.equal((await db.query('select * from io_activity')).rows.length,0);
+ await as(A);await call('io_invite',[inmate,'family@example.test']);await as(B);invites=await call('io_invitations');
+ await as(A);await call('io_revoke_invite',[inmate,invites[0].id]);await as(B);await assert.rejects(()=>call('io_accept',[invites[0].id]),/unavailable/);
+ await as(C);const other=await call('io_create',[{...state,profile:{...state.profile,name:'Other inmate'}}]);assert.notEqual(other,inmate);assert.equal((await db.query('select * from io_inmates')).rows.length,1);
+ await db.exec('reset role; set role anon');await assert.rejects(()=>db.query('select * from io_inmates'),/permission denied/);await assert.rejects(()=>call('io_read',[inmate]),/permission denied/);
+ await db.close();
+});

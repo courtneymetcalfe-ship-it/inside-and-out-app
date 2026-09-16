@@ -1,5 +1,5 @@
-type Entry = { id:string; kind:string; title:string; date:string; time:string; place:string; details:string; status:string; attachment?:string; reminderId?:string };
-type State = { version:1; demo:boolean; profile:{name:string; min:string; location:string}; entries:Entry[] };
+type Entry = { id:string; kind:string; title:string; date:string; time:string; place:string; details:string; status:string; attachment?:string; reminderId?:string; updatedBy?:string; updatedAt?:string };
+type State = { cloudRevision?:number; version:1; demo:boolean; profile:{name:string; min:string; location:string}; entries:Entry[] };
 const kinds = ['Court','Medical','Visit','Call','Note','Task','Document'];
 const statuses = ['Planned','Follow up','Completed','Receiving','Not confirmed','Missing'];
 const empty = ():State => ({version:1,demo:false,profile:{name:'',min:'',location:''},entries:[]});
@@ -22,7 +22,7 @@ function validate(e:Entry) {
 function parse(raw:string):State {
   const x=JSON.parse(raw);
   if(x?.version!==1 || typeof x.demo!=='boolean' || !x.profile || !['name','min','location'].every(k=>typeof x.profile[k]==='string') || !Array.isArray(x.entries)) throw new Error('This data file is not a supported Inside & Out backup.');
-  if(x.entries.some((e:any)=>!e || !['id','kind','title','date','time','place','details','status'].every(k=>typeof e[k]==='string') || validate(e) || (e.attachment!==undefined&&typeof e.attachment!=='string') || (e.reminderId!==undefined&&typeof e.reminderId!=='string'))) throw new Error('A record in this data file is invalid.');
+  if(x.entries.some((e:any)=>!e || !['id','kind','title','date','time','place','details','status'].every(k=>typeof e[k]==='string') || validate(e) || (e.attachment!==undefined&&typeof e.attachment!=='string') || (e.reminderId!==undefined&&typeof e.reminderId!=='string') || (e.updatedBy!==undefined&&typeof e.updatedBy!=='string') || (e.updatedAt!==undefined&&typeof e.updatedAt!=='string'))) throw new Error('A record in this data file is invalid.');
   if(new Set(x.entries.map((e:Entry)=>e.id)).size!==x.entries.length) throw new Error('Duplicate record IDs in this data file.');
   return x;
 }

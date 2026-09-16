@@ -10,8 +10,8 @@ const items=[
   {key:'Call',label:'Calls',icon:'phone-outline'},
   {key:'More',label:'More',icon:'dots-horizontal'},
 ];
-export default function BottomNav({active='Home',onSelect}:{active?:string;onSelect?:(key:string)=>void}){
- return <View style={s.bar}>{items.map(i=><Pressable accessibilityRole="button" accessibilityLabel={i.label} key={i.key} onPress={()=>onSelect?.(i.key)} style={[s.item,i.key==='Add'&&s.addWrap,i.key===active&&i.key!=='Add'&&s.activePill]}>
+export default function BottomNav({active='Home',onSelect,canAdd=true}:{active?:string;canAdd?:boolean;onSelect?:(key:string)=>void}){
+ return <View style={s.bar}>{items.filter(i=>canAdd||i.key!=='Add').map(i=><Pressable accessibilityRole="button" accessibilityLabel={i.label} key={i.key} onPress={()=>onSelect?.(i.key)} style={[s.item,i.key==='Add'&&s.addWrap,i.key===active&&i.key!=='Add'&&s.activePill]}>
    <View style={i.key==='Add'?s.add:undefined}><MaterialCommunityIcons name={i.icon as any} size={i.key==='Add'?27:23} color={i.key===active||i.key==='Add'?colors.teal:'#71828A'} /></View>
    <Text style={[s.label,i.key===active&&s.active,i.key==='Add'&&s.addLabel]}>{i.label}</Text>
  </Pressable>)}</View>
