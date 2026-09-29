@@ -1,6 +1,6 @@
 # Inmate profiles and family access
 
-Implementation is prepared; a Supabase project must be provisioned before family sharing can be enabled in a release. No existing personal data has been uploaded.
+The Sydney Supabase project `skygjvroyyqrhvqjjvwg` is active. The family schema was deployed on 29 September 2026; RLS, anonymous RPC denial and Realtime publication were verified. The security advisor reports no issues. No existing personal data has been uploaded. Email delivery and two-account acceptance testing remain release gates.
 
 ## Behaviour
 
@@ -30,4 +30,4 @@ Implementation is prepared; a Supabase project must be provisioned before family
 
 `npm test` runs model, migration/isolation and real PostgreSQL permission tests using PGlite. `npm run typecheck` validates the app. `npx expo export --platform ios` validates the JavaScript release bundle, not an on-device login or signing test.
 
-The Supabase plugin was connected during implementation, but its callable tools did not appear in that session. No project, cloud schema or Expo environment values were created, and no claim of cross-device deployment should be made until those steps are verified.
+The production build profile in `eas.json` supplies the project URL and public publishable key. Privileged functions live in the non-exposed `io_private` schema behind security-invoker API wrappers and explicit grants. The Supabase client version is pinned. All ten tests and TypeScript checks pass. Family sharing has not yet been released to TestFlight.

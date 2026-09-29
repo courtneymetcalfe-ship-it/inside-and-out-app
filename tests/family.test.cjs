@@ -29,7 +29,7 @@ test('database enforces one admin, isolated inmate access, invitations, task upd
  await assert.rejects(()=>call('io_task_status',[inmate,'task-1',false,0]),/Another family member/);
  await as(A);await assert.rejects(()=>call('io_save',[inmate,0,state]),/Another family member/);
  await assert.rejects(()=>call('io_remove_member',[inmate,A]),/sole admin/);
- await assert.rejects(()=>call('io_log',[inmate,'Forged event']),/permission denied/);
+ await assert.rejects(()=>db.query('select io_private.io_log($1,$2)',[inmate,'Forged event']),/permission denied/);
  await call('io_remove_member',[inmate,B]);
  await as(B);await assert.rejects(()=>call('io_read',[inmate]),/access/i);await assert.rejects(()=>call('io_task_status',[inmate,'task-1',false,1]),/Access denied/);
  assert.equal((await db.query('select * from io_activity')).rows.length,0);
