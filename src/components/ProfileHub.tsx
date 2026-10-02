@@ -1,4 +1,5 @@
 import {model} from '../lib/model';
+import PrivacyNotice from './PrivacyNotice';
 import React,{useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {signInDraft} from '../lib/signInDraft';
 import {View} from 'react-native';
@@ -88,6 +89,7 @@ export default function ProfileHub({children}:Props){
  {!!error&&<Label variant="error">{error}</Label>}
  </Sheet>
  <Sheet open={modal==='family'} title="Family access" onClose={()=>!busy&&setModal(null)}>
+ <PrivacyNotice/>
  {!familyConfigured?<><Label variant="heading">Family sharing is not connected yet</Label><Label>Your inmate profiles work on this device. Shared accounts will become available after the app’s cloud connection is configured.</Label></>:!account?<>
  <Label>Sign in with your own email. Each inmate has one admin who controls family access.</Label>
  <Field label="Your email address" value={email} onChange={v=>{signInDraft.email(v);setCode('');}}/>
