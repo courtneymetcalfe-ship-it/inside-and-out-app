@@ -39,6 +39,9 @@
     "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "^0.21.2"
   },
+  "overrides": {
+    "postcss": "8.5.28"
+  },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@types/react": "~19.1.10",
