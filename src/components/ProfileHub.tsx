@@ -14,7 +14,10 @@ export default function ProfileHub({children}:Props){
  const [book,setBook]=useState<ProfileBook|null>(null);const bookRef=useRef<ProfileBook|null>(null);
  const [cloud,setCloud]=useState<SharedProfile[]>([]);const [cloudId,setCloudId]=useState('');
  const [account,setAccount]=useState<{id:string;email:string}|null>(null);
- const [modal,setModal]=useState<'switch'|'family'|'share'|null>(()=>signInDraft.snapshot().email?'family':null);
+ const [modal,setModal]=useState<'switch'|'family'|'share'|'delete'|null>(()=>signInDraft.snapshot().email?'family':null);
+ const [deleteProfiles,setDeleteProfiles]=useState<(SharedProfile&{members:Team['members']})[]>([]);
+ const [deleteChoices,setDeleteChoices]=useState<Record<string,{action:'transfer'|'delete';target?:string}>>({});
+ const [deleteConfirmation,setDeleteConfirmation]=useState('');
  const {email,sent}=useSyncExternalStore(signInDraft.subscribe,signInDraft.snapshot,signInDraft.snapshot);
  const [name,setName]=useState('');const [code,setCode]=useState('');
  const [recipient,setRecipient]=useState('');const [team,setTeam]=useState<Team|null>(null);
@@ -55,6 +58,23 @@ export default function ProfileHub({children}:Props){
  async function openFamily(){setTeam(null);setActivity([]);setModal('family');if(!account)return;
    await loadCloud();if(cloudId){setTeam(await rpc('io_team',{inmate:cloudId}));const {data,error}=await family!.from('io_activity').select('id,actor_email,action,created_at').eq('inmate_id',cloudId).order('created_at',{ascending:false}).limit(30);if(error)throw error;setActivity(data||[]);}
  }
+ async function openDeletion(){
+   const profiles=(await sharedProfiles()).filter(p=>p.admin_id===account?.id);
+   const details=await Promise.all(profiles.map(async p=>({...p,members:(await rpc<Team>('io_team',{inmate:p.id})).members.filter(m=>!m.admin)})));
+   setDeleteProfiles(details);setDeleteChoices({});setDeleteConfirmation('');setModal('delete');
+ }
+ async function deleteAccount(){
+   if(deleteConfirmation!=='DELETE MY ACCOUNT'||deleteProfiles.some(p=>!deleteChoices[p.id]))throw new Error('Choose what happens to each profile and type DELETE MY ACCOUNT.');
+   const choices=deleteProfiles.map(p=>({id:p.id,...deleteChoices[p.id]}));
+   const {data,error}=await family!.functions.invoke('delete-account',{body:{choices,confirmation:deleteConfirmation}});
+   if(error||!data?.deleted){
+     let message=data?.error;
+     if(error&&'context' in error){try{message=(await error.context.json()).error;}catch{}}
+     throw new Error(message||'Deletion has not finished. Retry to finish, or contact insideandoutapp.support@gmail.com.');
+   }
+   await family!.auth.signOut({scope:'local'});signInDraft.clear();setAccount(null);setCloudId('');setCloud([]);setInvitations([]);setTeam(null);setActivity([]);setModal(null);
+   setNotice('Your family account was deleted. Separate profiles saved on this device remain here.');
+ }
  if(!book||!source)return <Shell nav={null}><Label variant="title">Inside & Out</Label><Label>{error||'Opening inmate profiles…'}</Label></Shell>;
  const toolbar=<Box variant="card"><Box variant="row"><View style={{flex:1}}><Label variant="badge">{cloudId?(isAdmin?'SHARED · ADMIN':'SHARED · FAMILY MEMBER'):'ON THIS DEVICE'}</Label><Label variant="heading">{selected?.name||local?.state.profile.name||'Your inmate profile'}</Label></View><Action disabled={busy} tone="quiet" onPress={()=>{setError('');setModal('switch');}}>Switch inmate</Action></Box><Action disabled={busy} tone="quiet" onPress={()=>run(openFamily)}>Family access</Action>{!!error&&<Label variant="error">{error}</Label>}{!!notice&&<Label variant="accent">{notice}</Label>}</Box>;
  return <>{children(source,toolbar,cloudId?`shared-${account?.id}-${cloudId}`:`local-${book.selectedId}`)}
@@ -85,9 +105,25 @@ export default function ProfileHub({children}:Props){
  {activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {model.displayTimestamp(a.created_at)}</Label></Box>)}
  <Action disabled={busy} tone="quiet" onPress={()=>run(openFamily)}>Refresh family activity</Action>
  </>}
+ <Action disabled={busy} tone="quiet" onPress={()=>run(openDeletion)}>Delete my family account</Action>
  <Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{const {error}=await family!.auth.signOut({scope:'local'});if(error)throw error;setModal(null);})}>Sign out</Action>
  </>}
  {!!error&&<Label variant="error">{error}</Label>}{!!notice&&<Label variant="accent">{notice}</Label>}
+ </Sheet>
+ <Sheet open={modal==='delete'} title="Delete your family account" onClose={()=>!busy&&setModal('family')}>
+ <Label>This permanently deletes your sign-in account, family memberships and pending invitations to your email. Choose what happens to every profile you administer.</Label>
+ {deleteProfiles.map(p=><Box variant="card" key={p.id}>
+   <Label variant="heading">{p.name}</Label>
+   <Label>Transfer keeps this profile and its documents for the family. The selected member becomes the only admin.</Label>
+   {p.members.map(m=><Action key={m.id} disabled={busy} tone={deleteChoices[p.id]?.target===m.id?'selected':'quiet'} onPress={()=>setDeleteChoices(v=>({...v,[p.id]:{action:'transfer',target:m.id}}))}>Transfer admin to {m.email}</Action>)}
+   {!p.members.length&&<Label variant="small">No family members are available. Cancel and invite a member first if you want to transfer this profile.</Label>}
+   <Action disabled={busy} tone={deleteChoices[p.id]?.action==='delete'?'selected':'quiet'} onPress={()=>setDeleteChoices(v=>({...v,[p.id]:{action:'delete'}}))}>Permanently delete {p.name} and all shared documents</Action>
+ </Box>)}
+ <Label>Deleted profiles become unavailable to everyone immediately. File cleanup may take time; if interrupted, retry this request. Transfers and profile deletions cannot be undone here.</Label>
+ <Label variant="small">Shared records you do not delete remain with their admin. Account attribution is anonymised, but names or details typed into records and documents may remain. Copies already downloaded by others cannot be recalled. Separate “On this device” profiles and exports are not deleted.</Label>
+ <Field label="Type DELETE MY ACCOUNT to confirm" value={deleteConfirmation} onChange={setDeleteConfirmation}/>
+ <Action disabled={busy||deleteConfirmation!=='DELETE MY ACCOUNT'||deleteProfiles.some(p=>!deleteChoices[p.id])} onPress={()=>run(deleteAccount)}>{busy?'Deleting…':'Confirm permanent account deletion'}</Action>
+ {!!error&&<Label variant="error">{error}</Label>}
  </Sheet>
  <Sheet open={modal==='share'} title="Share this inmate profile?" onClose={()=>!busy&&setModal('family')}>
  <Label>This will upload {local?.state.profile.name}’s profile details and {local?.state.entries.length||0} records to your family account. Only you and family members you invite will have access.</Label>
