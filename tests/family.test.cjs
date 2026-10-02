@@ -10,6 +10,8 @@ test('database enforces one admin, isolated inmate access, invitations, task upd
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
  await db.query('insert into auth.users values ($1,$2,now()),($3,$4,now()),($5,$6,now())',[A,'admin@example.test',B,'family@example.test',C,'stranger@example.test']);
  await db.exec(migration);
+ await db.exec(`create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); create table storage.objects(bucket_id text,name text,primary key(bucket_id,name)); alter table storage.objects enable row level security; grant usage on schema storage to authenticated,anon; grant select,insert,delete,update on storage.objects to authenticated;`);
+ await db.exec(fs.readFileSync('supabase/migrations/20261002031236_profile_files.sql','utf8'));
  async function as(id){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role authenticated');}
  async function call(fn,args=[],placeholders=args.map((_,i)=>'$'+(i+1)).join(',')){return (await db.query(`select public.${fn}(${placeholders}) as result`,args)).rows[0].result;}
  await as(A);const inmate=await call('io_create',[state]);
@@ -30,9 +32,19 @@ test('database enforces one admin, isolated inmate access, invitations, task upd
  await as(A);await assert.rejects(()=>call('io_save',[inmate,0,state]),/Another family member/);
  await assert.rejects(()=>call('io_remove_member',[inmate,A]),/sole admin/);
  await assert.rejects(()=>db.query('select io_private.io_log($1,$2)',[inmate,'Forged event']),/permission denied/);
+ const filePath=inmate+'/test.pdf';
+ await db.query("insert into storage.objects values ('io-files',$1)",[filePath]);
+ const withFile={...shared.state,entries:[...shared.state.entries,{...state.entries[0],id:'document-1',kind:'Document',title:'Test PDF',attachment:'io-files/'+filePath}]};
+ await call('io_save',[inmate,1,withFile]);
+ await assert.rejects(()=>call('io_save',[inmate,2,{...withFile,entries:[{...withFile.entries[1],attachment:'io-files/'+C+'/other.pdf'}]}]),/another inmate/);
+ await as(B);assert.equal((await db.query('select * from storage.objects')).rows.length,1);
+ await assert.rejects(()=>db.query("insert into storage.objects values ('io-files',$1)",[inmate+'/member.pdf']),/row-level security/);
+ assert.equal((await db.query("delete from storage.objects where name=$1 returning *",[filePath])).rows.length,0);
+ await as(C);assert.equal((await db.query('select * from storage.objects')).rows.length,0);
+ await as(A);
  await call('io_remove_member',[inmate,B]);
  await as(B);await assert.rejects(()=>call('io_read',[inmate]),/access/i);await assert.rejects(()=>call('io_task_status',[inmate,'task-1',false,1]),/Access denied/);
- assert.equal((await db.query('select * from io_activity')).rows.length,0);
+ assert.equal((await db.query('select * from io_activity')).rows.length,0);assert.equal((await db.query('select * from storage.objects')).rows.length,0);
  await as(A);await call('io_invite',[inmate,'family@example.test']);await as(B);invites=await call('io_invitations');
  await as(A);await call('io_revoke_invite',[inmate,invites[0].id]);await as(B);await assert.rejects(()=>call('io_accept',[invites[0].id]),/unavailable/);
  await as(C);const other=await call('io_create',[{...state,profile:{...state.profile,name:'Other inmate'}}]);assert.notEqual(other,inmate);assert.equal((await db.query('select * from io_inmates')).rows.length,1);

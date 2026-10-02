@@ -30,5 +30,8 @@ export type RecordSource = {
   load:()=>Promise<RecordState>;
   save:(state:RecordState)=>Promise<void>;
   subscribe?:(onChange:()=>void)=>()=>void;
+  attach?:(file:any)=>Promise<string>;
+  openAttachment?:(path:string)=>Promise<void>;
+  removeAttachment?:(path:string)=>Promise<void>;
   completeTask?:(id:string,completed:boolean,revision?:number)=>Promise<RecordState>;
 };

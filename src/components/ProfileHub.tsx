@@ -1,3 +1,4 @@
+import {model} from '../lib/model';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {View} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -76,9 +77,9 @@ export default function ProfileHub({children}:Props){
  <Label>{isAdmin?'You are the only admin for this inmate.':'You can view records and update task completion. The admin manages records and family access.'}</Label>
  {team?.members.map(m=><Box variant="card" key={m.id}><Label>{m.email}</Label><Label variant="badge">{m.admin?'ADMIN':'FAMILY MEMBER'}</Label>{isAdmin&&!m.admin&&<Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_remove_member',{inmate:cloudId,member:m.id});await openFamily();})}>Remove access</Action>}</Box>)}
  {isAdmin&&<><Field label="Family member’s email" value={recipient} onChange={setRecipient}/><Action disabled={busy} onPress={()=>run(async()=>{await rpc('io_invite',{inmate:cloudId,recipient:recipient.trim().toLowerCase()});setRecipient('');await openFamily();setNotice('Invitation ready for 7 days. Ask them to sign in with this email and open Family access. No invitation email has been sent.');})}>Create invitation</Action>
- {team?.invites.map(v=><Box variant="card" key={v.id}><Label>{v.email} · Pending</Label><Label variant="small">Expires {new Date(v.expires).toLocaleDateString('en-AU')}</Label><Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_revoke_invite',{inmate:cloudId,invitation:v.id});await openFamily();})}>Revoke invitation</Action></Box>)}</>}
+ {team?.invites.map(v=><Box variant="card" key={v.id}><Label>{v.email} · Pending</Label><Label variant="small">Expires {model.displayTimestamp(v.expires)}</Label><Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_revoke_invite',{inmate:cloudId,invitation:v.id});await openFamily();})}>Revoke invitation</Action></Box>)}</>}
  <Label variant="heading">Recent family activity</Label>
- {activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {new Date(a.created_at).toLocaleString('en-AU')}</Label></Box>)}
+ {activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {model.displayTimestamp(a.created_at)}</Label></Box>)}
  <Action disabled={busy} tone="quiet" onPress={()=>run(openFamily)}>Refresh family activity</Action>
  </>}
  <Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{const {error}=await family!.auth.signOut({scope:'local'});if(error)throw error;setModal(null);})}>Sign out</Action>
@@ -87,7 +88,7 @@ export default function ProfileHub({children}:Props){
  </Sheet>
  <Sheet open={modal==='share'} title="Share this inmate profile?" onClose={()=>!busy&&setModal('family')}>
  <Label>This will upload {local?.state.profile.name}’s profile details and {local?.state.entries.length||0} records to your family account. Only you and family members you invite will have access.</Label>
- <Label variant="small">Your original device profile remains as a separate copy. Changes to that copy will not sync. Attached document files cannot be shared in this version; profiles containing attachments must stay on this device.</Label>
+ <Label variant="small">Your original device profile remains as a separate copy. Changes to that copy will not sync. Existing attached files stay on this device. To share them, create a shared profile without attachments and upload the files to its Documents section.</Label>
  <Action disabled={busy||!!local?.state.entries.some(e=>e.attachment)} onPress={()=>run(async()=>{
    const state=bookRef.current!.profiles.find(p=>p.id===bookRef.current!.selectedId)!.state;
    const clean:RecordState={...state,entries:state.entries.map(({reminderId,...e})=>e)};

@@ -13,7 +13,9 @@ The Sydney Supabase project `skygjvroyyqrhvqjjvwg` is active. The family schema 
 - Family members read all shared records and can complete or reopen tasks. Only the admin edits/deletes records. Activity shows who changed task status and when.
 - Shared data stays in memory and is cleared on sign-out. Realtime invalidates the active profile; foreground/manual refresh and a 30-second access recheck cover missed events and membership revocation. Server checks apply on every operation.
 - Optimistic revisions reject stale updates. Users close stale editing forms and refresh before retrying.
-- Shared document bytes/uploads are not implemented. Profiles containing attached files cannot be promoted. Original documents stay in device profiles. Device reminders also remain local.
+- The admin can upload PDF, Word, text, JPG, PNG and HEIC files up to 20 MB each. Shared files use the private io-files bucket with inmate-scoped read/upload/delete policies. Members can read attached files; only the admin uploads and deletes. Download links expire after 60 seconds; downloaded copies cannot be recalled. Profiles containing local files are not automatically promoted: create a shared profile and explicitly upload the chosen files. Device reminders remain local.
+- Dates display and accept DD-MM-YYYY, including PDF/CSV exports. ISO dates remain in stored data and JSON backups for compatibility.
+- A failed network response after upload may leave an admin-only orphan file. The app does not automatically delete it because the record save may have succeeded remotely; refresh before retrying.
 
 ## Provisioning gate
 
@@ -30,4 +32,8 @@ The Sydney Supabase project `skygjvroyyqrhvqjjvwg` is active. The family schema 
 
 `npm test` runs model, migration/isolation and real PostgreSQL permission tests using PGlite. `npm run typecheck` validates the app. `npx expo export --platform ios` validates the JavaScript release bundle, not an on-device login or signing test.
 
-The production build profile in `eas.json` supplies the project URL and public publishable key. Privileged functions live in the non-exposed `io_private` schema behind security-invoker API wrappers and explicit grants. The Supabase client version is pinned. All ten tests and TypeScript checks pass. Family sharing has not yet been released to TestFlight.
+The production build profile in `eas.json` supplies the project URL and public publishable key. Privileged functions live in the non-exposed `io_private` schema behind security-invoker API wrappers and explicit grants. The Supabase client version is pinned. All eleven tests and TypeScript checks pass. Family sharing has not yet been released to TestFlight.
+
+## 2 October checkpoint
+
+Private file storage migration is deployed; hosted security advisor reports no issues. File isolation/revocation checks, date validation tests and type checks pass. Gmail SMTP is enabled and both code templates are saved, but the 29 September delivery test failed with Google SMTP 534 (application-specific password required). The user must replace the saved SMTP password privately before email/device acceptance testing and TestFlight release.

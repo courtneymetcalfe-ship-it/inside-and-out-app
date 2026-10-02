@@ -1,6 +1,8 @@
 import 'react-native-url-polyfill/auto';
 import {createClient,processLock} from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
+import {File} from 'expo-file-system';
+import * as Linking from 'expo-linking';
 import {AppState,Platform} from 'react-native';
 import {model} from './model';
 import type {RecordState,RecordSource} from './profiles';
@@ -38,14 +40,40 @@ export function cloudSource(id:string,admin:boolean):RecordSource {
     const result=await rpc<{state:RecordState;revision:number}>('io_read',{inmate:id});
     const parsed=model.parse(JSON.stringify(result.state));return {...parsed,cloudRevision:result.revision};
   }
+  function objectPath(path:string){
+    if(!path.startsWith(`io-files/${id}/`))throw new Error('This file does not belong to the selected profile.');
+    return path.slice('io-files/'.length);
+  }
   return {shared:true,admin,load,
+    async attach(file){
+      if(!admin)throw new Error('Only the profile admin can upload files.');
+      const limit=20*1024*1024;
+      if(file.size>limit)throw new Error('Choose a file smaller than 20 MB.');
+      const contentType=file.mimeType||file.type||'application/octet-stream';
+      const allowed=['application/pdf','image/jpeg','image/png','image/heic','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if(!allowed.includes(contentType))throw new Error('Choose a PDF, Word document, text file, JPG, PNG or HEIC image.');
+      const bytes=Platform.OS==='web'?(file.file?await file.file.arrayBuffer():await fetch(file.uri).then(r=>r.arrayBuffer())):await new File(file.uri).arrayBuffer();
+      if(bytes.byteLength>limit||!bytes.byteLength)throw new Error('Choose a non-empty file smaller than 20 MB.');
+      const name=String(file.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120);
+      const path=`${id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`;
+      const {error}=await family!.storage.from('io-files').upload(path,bytes,{contentType,upsert:false});
+      if(error)throw new Error(error.message);return `io-files/${path}`;
+    },
+    async openAttachment(path){
+      const {data,error}=await family!.storage.from('io-files').createSignedUrl(objectPath(path),60,{download:true});
+      if(error)throw new Error(error.message);await Linking.openURL(data.signedUrl);
+    },
+    async removeAttachment(path){
+      const {error}=await family!.storage.from('io-files').remove([objectPath(path)]);
+      if(error)throw new Error(error.message);
+    },
     subscribe(onChange){
       const channel=family!.channel(`inmate-${id}-${Math.random()}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'io_inmates',filter:`id=eq.${id}`},onChange).subscribe();
       return ()=>{void family!.removeChannel(channel);};
     },
     async save(state){
       // Never expose private device paths or reminder identifiers to other users.
-      if(state.entries.some(e=>e.attachment))throw new Error('Shared document uploads are not available yet. Keep document copies in a device profile.');
+      if(state.entries.some(e=>e.attachment&&!e.attachment.startsWith(`io-files/${id}/`)))throw new Error('A file belongs to a different profile or is only saved on this device.');
       const {cloudRevision,...base}=state;
       const clean={...base,entries:state.entries.map(({reminderId,...e})=>e)};
       const result=await rpc<number>('io_save',{inmate:id,expected:cloudRevision,payload:clean});state.cloudRevision=result;
