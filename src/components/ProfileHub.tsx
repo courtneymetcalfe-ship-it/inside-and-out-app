@@ -1,5 +1,6 @@
 import {model} from '../lib/model';
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
+import {signInDraft} from '../lib/signInDraft';
 import {View} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Action,Box,Field,Label,Sheet,Shell} from './Surface';
@@ -13,8 +14,9 @@ export default function ProfileHub({children}:Props){
  const [book,setBook]=useState<ProfileBook|null>(null);const bookRef=useRef<ProfileBook|null>(null);
  const [cloud,setCloud]=useState<SharedProfile[]>([]);const [cloudId,setCloudId]=useState('');
  const [account,setAccount]=useState<{id:string;email:string}|null>(null);
- const [modal,setModal]=useState<'switch'|'family'|'share'|null>(null);
- const [name,setName]=useState('');const [email,setEmail]=useState('');const [code,setCode]=useState('');const [sent,setSent]=useState(false);
+ const [modal,setModal]=useState<'switch'|'family'|'share'|null>(()=>signInDraft.snapshot().email?'family':null);
+ const {email,sent}=useSyncExternalStore(signInDraft.subscribe,signInDraft.snapshot,signInDraft.snapshot);
+ const [name,setName]=useState('');const [code,setCode]=useState('');
  const [recipient,setRecipient]=useState('');const [team,setTeam]=useState<Team|null>(null);
  const [invitations,setInvitations]=useState<{id:string;name:string}[]>([]);
  const [activity,setActivity]=useState<{id:number;actor_email:string;action:string;created_at:string}[]>([]);
@@ -34,6 +36,7 @@ export default function ProfileHub({children}:Props){
    if(!family)return;
    const {data}=family.auth.onAuthStateChange((_event,session)=>{
      setAccount(session?{id:session.user.id,email:session.user.email||''}:null);
+     if(session)signInDraft.clear();
      if(!session){setCloudId('');setCloud([]);setInvitations([]);setTeam(null);setActivity([]);}
    });return()=>data.subscription.unsubscribe();
  },[]);
@@ -67,9 +70,9 @@ export default function ProfileHub({children}:Props){
  <Sheet open={modal==='family'} title="Family access" onClose={()=>!busy&&setModal(null)}>
  {!familyConfigured?<><Label variant="heading">Family sharing is not connected yet</Label><Label>Your inmate profiles work on this device. Shared accounts will become available after the app’s cloud connection is configured.</Label></>:!account?<>
  <Label>Sign in with your own email. Each inmate has one admin who controls family access.</Label>
- <Field label="Your email address" value={email} onChange={v=>{setEmail(v);setSent(false);setCode('');}}/>
- <Action disabled={busy||!email.trim()} onPress={()=>run(async()=>{const {error}=await family!.auth.signInWithOtp({email:email.trim().toLowerCase()});if(error)throw error;setSent(true);setNotice('Check your email for a sign-in code.');})}>{sent?'Send another code':'Send sign-in code'}</Action>
- {sent&&<><Field label="Email sign-in code" value={code} onChange={setCode}/><Action disabled={busy} onPress={()=>run(async()=>{const {error}=await family!.auth.verifyOtp({email:email.trim().toLowerCase(),token:code.trim(),type:'email'});if(error)throw error;setCode('');setSent(false);await loadCloud();setNotice('Signed in. Choose an invitation or share your device profile.');})}>Sign in</Action></>}
+ <Field label="Your email address" value={email} onChange={v=>{signInDraft.email(v);setCode('');}}/>
+ <Action disabled={busy||!email.trim()} onPress={()=>run(async()=>{const destination=email.trim().toLowerCase();const {error}=await family!.auth.signInWithOtp({email:destination});if(error)throw error;signInDraft.sent(destination);setNotice('Check your email for a sign-in code. You can leave the app and return to enter it.');})}>{sent?'Send another code':'Send sign-in code'}</Action>
+ {!!email.trim()&&<><Field label="Email sign-in code" value={code} onChange={setCode}/><Action disabled={busy||!code.trim()} onPress={()=>run(async()=>{const {error}=await family!.auth.verifyOtp({email:email.trim().toLowerCase(),token:code.trim(),type:'email'});if(error)throw error;setCode('');signInDraft.clear();await loadCloud();setNotice('Signed in. Choose an invitation or share your device profile.');})}>Sign in</Action></>}
  </>:<>
  <Label variant="small">Signed in as {account.email}</Label>
  {invitations.map(v=><Box variant="card" key={v.id}><Label>Invitation to {v.name}</Label><Action disabled={busy} onPress={()=>run(async()=>{const id=await rpc<string>('io_accept',{invitation:v.id});await loadCloud();setCloudId(id);setModal(null);})}>Accept invitation</Action></Box>)}
