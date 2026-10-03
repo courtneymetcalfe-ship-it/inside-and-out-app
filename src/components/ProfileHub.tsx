@@ -57,7 +57,7 @@ export default function ProfileHub({children}:Props){
      save:async state=>{await saveBook(replaceProfile(bookRef.current!,id,state));}};
  },[cloudId,book?.selectedId,account?.id,selected?.admin_id]);
  async function openFamily(){setTeam(null);setActivity([]);setModal('family');if(!account)return;
-   await loadCloud();if(cloudId){setTeam(await rpc('io_team',{inmate:cloudId}));const {data,error}=await family!.from('io_activity').select('id,actor_email,action,created_at').eq('inmate_id',cloudId).order('created_at',{ascending:false}).limit(30);if(error)throw error;setActivity(data||[]);}
+   await loadCloud();if(cloudId){setTeam(await rpc('io_team',{inmate:cloudId}));const {data,error}=await family!.from('io_activity').select('id,actor_email,action,created_at').eq('inmate_id',cloudId).order('created_at',{ascending:false});if(error)throw error;setActivity(data||[]);}
  }
  async function openDeletion(){
    const profiles=(await sharedProfiles()).filter(p=>p.admin_id===account?.id);
@@ -98,13 +98,13 @@ export default function ProfileHub({children}:Props){
  </>:<>
  <Label variant="small">Signed in as {account.email}</Label>
  {invitations.map(v=><Box variant="card" key={v.id}><Label>Invitation to {v.name}</Label><Action disabled={busy} onPress={()=>run(async()=>{const id=await rpc<string>('io_accept',{invitation:v.id});await loadCloud();setCloudId(id);setModal(null);})}>Accept invitation</Action></Box>)}
- {!cloudId?<><Label>Share this inmate’s profile with family. You will become its only admin. Invited members can view all shared records and mark tasks completed or reopen them.</Label><Action disabled={busy||!local?.state.profile.name} onPress={()=>setModal('share')}>Set up shared profile</Action></>:<>
- <Label>{isAdmin?'You are the only admin for this inmate.':'You can view records and update task completion. The admin manages records and family access.'}</Label>
+ {!cloudId?<><Label>Share this inmate’s profile with family. You will become its only admin. Invited members can view all shared records, documents and the full family activity history, and can mark tasks completed or reopen them.</Label><Action disabled={busy||!local?.state.profile.name} onPress={()=>setModal('share')}>Set up shared profile</Action></>:<>
+ <Label>{isAdmin?'You are the only admin for this inmate.':'You can view records, documents and the full family activity history, and update task completion. The admin manages records and family access.'}</Label>
  {team?.members.map(m=><Box variant="card" key={m.id}><Label>{m.email}</Label><Label variant="badge">{m.admin?'ADMIN':'FAMILY MEMBER'}</Label>{isAdmin&&!m.admin&&<Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_remove_member',{inmate:cloudId,member:m.id});await openFamily();})}>Remove access</Action>}</Box>)}
  {isAdmin&&<><Field label="Family member’s email" value={recipient} onChange={setRecipient}/><Action disabled={busy} onPress={()=>run(async()=>{await rpc('io_invite',{inmate:cloudId,recipient:recipient.trim().toLowerCase()});setRecipient('');await openFamily();setNotice('Invitation ready for 7 days. Ask them to sign in with this email and open Family access. No invitation email has been sent.');})}>Create invitation</Action>
  {team?.invites.map(v=><Box variant="card" key={v.id}><Label>{v.email} · Pending</Label><Label variant="small">Expires {model.displayTimestamp(v.expires)}</Label><Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_revoke_invite',{inmate:cloudId,invitation:v.id});await openFamily();})}>Revoke invitation</Action></Box>)}</>}
- <Label variant="heading">Recent family activity</Label>
- {activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {model.displayTimestamp(a.created_at)}</Label></Box>)}
+ <Label variant="heading">Family activity</Label>
+ {activity.length===0?<Label variant="small">No shared activity yet.</Label>:activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {model.displayTimestamp(a.created_at)}</Label></Box>)}
  <Action disabled={busy} tone="quiet" onPress={()=>run(openFamily)}>Refresh family activity</Action>
  </>}
  <Action disabled={busy} tone="quiet" onPress={()=>run(openDeletion)}>Delete my family account</Action>
