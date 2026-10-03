@@ -1,17 +1,22 @@
-name: Submit iOS Build
+name: Build and Submit iOS
 
 on:
+  push:
+    branches: ['main']
   workflow_dispatch:
-    inputs:
-      build_id:
-        type: string
-        description: EAS iOS build ID to submit
-        required: true
 
 jobs:
-  submit:
-    name: Submit to App Store Connect
+  build_ios:
+    name: Build iOS production
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Submit to TestFlight
+    needs: [build_ios]
     type: submit
     params:
-      build_id: ${{ inputs.build_id }}
+      build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
