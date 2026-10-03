@@ -1,4 +1,7 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import {model} from '../lib/model';
+import PrivacyNotice from './PrivacyNotice';
+import React,{useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
+import {signInDraft} from '../lib/signInDraft';
 import {View} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Action,Box,Field,Label,Sheet,Shell} from './Surface';
@@ -12,8 +15,12 @@ export default function ProfileHub({children}:Props){
  const [book,setBook]=useState<ProfileBook|null>(null);const bookRef=useRef<ProfileBook|null>(null);
  const [cloud,setCloud]=useState<SharedProfile[]>([]);const [cloudId,setCloudId]=useState('');
  const [account,setAccount]=useState<{id:string;email:string}|null>(null);
- const [modal,setModal]=useState<'switch'|'family'|'share'|null>(null);
- const [name,setName]=useState('');const [email,setEmail]=useState('');const [code,setCode]=useState('');const [sent,setSent]=useState(false);
+ const [modal,setModal]=useState<'switch'|'family'|'share'|'delete'|null>(()=>signInDraft.snapshot().email?'family':null);
+ const [deleteProfiles,setDeleteProfiles]=useState<(SharedProfile&{members:Team['members']})[]>([]);
+ const [deleteChoices,setDeleteChoices]=useState<Record<string,{action:'transfer'|'delete';target?:string}>>({});
+ const [deleteConfirmation,setDeleteConfirmation]=useState('');
+ const {email,sent}=useSyncExternalStore(signInDraft.subscribe,signInDraft.snapshot,signInDraft.snapshot);
+ const [name,setName]=useState('');const [code,setCode]=useState('');
  const [recipient,setRecipient]=useState('');const [team,setTeam]=useState<Team|null>(null);
  const [invitations,setInvitations]=useState<{id:string;name:string}[]>([]);
  const [activity,setActivity]=useState<{id:number;actor_email:string;action:string;created_at:string}[]>([]);
@@ -33,6 +40,7 @@ export default function ProfileHub({children}:Props){
    if(!family)return;
    const {data}=family.auth.onAuthStateChange((_event,session)=>{
      setAccount(session?{id:session.user.id,email:session.user.email||''}:null);
+     if(session)signInDraft.clear();
      if(!session){setCloudId('');setCloud([]);setInvitations([]);setTeam(null);setActivity([]);}
    });return()=>data.subscription.unsubscribe();
  },[]);
@@ -51,6 +59,23 @@ export default function ProfileHub({children}:Props){
  async function openFamily(){setTeam(null);setActivity([]);setModal('family');if(!account)return;
    await loadCloud();if(cloudId){setTeam(await rpc('io_team',{inmate:cloudId}));const {data,error}=await family!.from('io_activity').select('id,actor_email,action,created_at').eq('inmate_id',cloudId).order('created_at',{ascending:false}).limit(30);if(error)throw error;setActivity(data||[]);}
  }
+ async function openDeletion(){
+   const profiles=(await sharedProfiles()).filter(p=>p.admin_id===account?.id);
+   const details=await Promise.all(profiles.map(async p=>({...p,members:(await rpc<Team>('io_team',{inmate:p.id})).members.filter(m=>!m.admin)})));
+   setDeleteProfiles(details);setDeleteChoices({});setDeleteConfirmation('');setModal('delete');
+ }
+ async function deleteAccount(){
+   if(deleteConfirmation!=='DELETE MY ACCOUNT'||deleteProfiles.some(p=>!deleteChoices[p.id]))throw new Error('Choose what happens to each profile and type DELETE MY ACCOUNT.');
+   const choices=deleteProfiles.map(p=>({id:p.id,...deleteChoices[p.id]}));
+   const {data,error}=await family!.functions.invoke('delete-account',{body:{choices,confirmation:deleteConfirmation}});
+   if(error||!data?.deleted){
+     let message=data?.error;
+     if(error&&'context' in error){try{message=(await error.context.json()).error;}catch{}}
+     throw new Error(message||'Deletion has not finished. Retry to finish, or contact insideandoutapp.support@gmail.com.');
+   }
+   await family!.auth.signOut({scope:'local'});signInDraft.clear();setAccount(null);setCloudId('');setCloud([]);setInvitations([]);setTeam(null);setActivity([]);setModal(null);
+   setNotice('Your family account was deleted. Separate profiles saved on this device remain here.');
+ }
  if(!book||!source)return <Shell nav={null}><Label variant="title">Inside & Out</Label><Label>{error||'Opening inmate profiles…'}</Label></Shell>;
  const toolbar=<Box variant="card"><Box variant="row"><View style={{flex:1}}><Label variant="badge">{cloudId?(isAdmin?'SHARED · ADMIN':'SHARED · FAMILY MEMBER'):'ON THIS DEVICE'}</Label><Label variant="heading">{selected?.name||local?.state.profile.name||'Your inmate profile'}</Label></View><Action disabled={busy} tone="quiet" onPress={()=>{setError('');setModal('switch');}}>Switch inmate</Action></Box><Action disabled={busy} tone="quiet" onPress={()=>run(openFamily)}>Family access</Action>{!!error&&<Label variant="error">{error}</Label>}{!!notice&&<Label variant="accent">{notice}</Label>}</Box>;
  return <>{children(source,toolbar,cloudId?`shared-${account?.id}-${cloudId}`:`local-${book.selectedId}`)}
@@ -64,11 +89,12 @@ export default function ProfileHub({children}:Props){
  {!!error&&<Label variant="error">{error}</Label>}
  </Sheet>
  <Sheet open={modal==='family'} title="Family access" onClose={()=>!busy&&setModal(null)}>
+ <PrivacyNotice/>
  {!familyConfigured?<><Label variant="heading">Family sharing is not connected yet</Label><Label>Your inmate profiles work on this device. Shared accounts will become available after the app’s cloud connection is configured.</Label></>:!account?<>
  <Label>Sign in with your own email. Each inmate has one admin who controls family access.</Label>
- <Field label="Your email address" value={email} onChange={v=>{setEmail(v);setSent(false);setCode('');}}/>
- <Action disabled={busy||!email.trim()} onPress={()=>run(async()=>{const {error}=await family!.auth.signInWithOtp({email:email.trim().toLowerCase()});if(error)throw error;setSent(true);setNotice('Check your email for a sign-in code.');})}>{sent?'Send another code':'Send sign-in code'}</Action>
- {sent&&<><Field label="Email sign-in code" value={code} onChange={setCode}/><Action disabled={busy} onPress={()=>run(async()=>{const {error}=await family!.auth.verifyOtp({email:email.trim().toLowerCase(),token:code.trim(),type:'email'});if(error)throw error;setCode('');setSent(false);await loadCloud();setNotice('Signed in. Choose an invitation or share your device profile.');})}>Sign in</Action></>}
+ <Field label="Your email address" value={email} onChange={v=>{signInDraft.email(v);setCode('');}}/>
+ <Action disabled={busy||!email.trim()} onPress={()=>run(async()=>{const destination=email.trim().toLowerCase();const {error}=await family!.auth.signInWithOtp({email:destination});if(error)throw error;signInDraft.sent(destination);setNotice('Check your email for a sign-in code. You can leave the app and return to enter it.');})}>{sent?'Send another code':'Send sign-in code'}</Action>
+ {!!email.trim()&&<><Field label="Email sign-in code" value={code} onChange={setCode}/><Action disabled={busy||!code.trim()} onPress={()=>run(async()=>{const {error}=await family!.auth.verifyOtp({email:email.trim().toLowerCase(),token:code.trim(),type:'email'});if(error)throw error;setCode('');signInDraft.clear();await loadCloud();setNotice('Signed in. Choose an invitation or share your device profile.');})}>Sign in</Action></>}
  </>:<>
  <Label variant="small">Signed in as {account.email}</Label>
  {invitations.map(v=><Box variant="card" key={v.id}><Label>Invitation to {v.name}</Label><Action disabled={busy} onPress={()=>run(async()=>{const id=await rpc<string>('io_accept',{invitation:v.id});await loadCloud();setCloudId(id);setModal(null);})}>Accept invitation</Action></Box>)}
@@ -76,18 +102,34 @@ export default function ProfileHub({children}:Props){
  <Label>{isAdmin?'You are the only admin for this inmate.':'You can view records and update task completion. The admin manages records and family access.'}</Label>
  {team?.members.map(m=><Box variant="card" key={m.id}><Label>{m.email}</Label><Label variant="badge">{m.admin?'ADMIN':'FAMILY MEMBER'}</Label>{isAdmin&&!m.admin&&<Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_remove_member',{inmate:cloudId,member:m.id});await openFamily();})}>Remove access</Action>}</Box>)}
  {isAdmin&&<><Field label="Family member’s email" value={recipient} onChange={setRecipient}/><Action disabled={busy} onPress={()=>run(async()=>{await rpc('io_invite',{inmate:cloudId,recipient:recipient.trim().toLowerCase()});setRecipient('');await openFamily();setNotice('Invitation ready for 7 days. Ask them to sign in with this email and open Family access. No invitation email has been sent.');})}>Create invitation</Action>
- {team?.invites.map(v=><Box variant="card" key={v.id}><Label>{v.email} · Pending</Label><Label variant="small">Expires {new Date(v.expires).toLocaleDateString('en-AU')}</Label><Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_revoke_invite',{inmate:cloudId,invitation:v.id});await openFamily();})}>Revoke invitation</Action></Box>)}</>}
+ {team?.invites.map(v=><Box variant="card" key={v.id}><Label>{v.email} · Pending</Label><Label variant="small">Expires {model.displayTimestamp(v.expires)}</Label><Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{await rpc('io_revoke_invite',{inmate:cloudId,invitation:v.id});await openFamily();})}>Revoke invitation</Action></Box>)}</>}
  <Label variant="heading">Recent family activity</Label>
- {activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {new Date(a.created_at).toLocaleString('en-AU')}</Label></Box>)}
+ {activity.map(a=><Box key={a.id}><Label>{a.action}</Label><Label variant="small">{a.actor_email} · {model.displayTimestamp(a.created_at)}</Label></Box>)}
  <Action disabled={busy} tone="quiet" onPress={()=>run(openFamily)}>Refresh family activity</Action>
  </>}
+ <Action disabled={busy} tone="quiet" onPress={()=>run(openDeletion)}>Delete my family account</Action>
  <Action disabled={busy} tone="quiet" onPress={()=>run(async()=>{const {error}=await family!.auth.signOut({scope:'local'});if(error)throw error;setModal(null);})}>Sign out</Action>
  </>}
  {!!error&&<Label variant="error">{error}</Label>}{!!notice&&<Label variant="accent">{notice}</Label>}
  </Sheet>
+ <Sheet open={modal==='delete'} title="Delete your family account" onClose={()=>!busy&&setModal('family')}>
+ <Label>This permanently deletes your sign-in account, family memberships and pending invitations to your email. Choose what happens to every profile you administer.</Label>
+ {deleteProfiles.map(p=><Box variant="card" key={p.id}>
+   <Label variant="heading">{p.name}</Label>
+   <Label>Transfer keeps this profile and its documents for the family. The selected member becomes the only admin.</Label>
+   {p.members.map(m=><Action key={m.id} disabled={busy} tone={deleteChoices[p.id]?.target===m.id?'selected':'quiet'} onPress={()=>setDeleteChoices(v=>({...v,[p.id]:{action:'transfer',target:m.id}}))}>Transfer admin to {m.email}</Action>)}
+   {!p.members.length&&<Label variant="small">No family members are available. Cancel and invite a member first if you want to transfer this profile.</Label>}
+   <Action disabled={busy} tone={deleteChoices[p.id]?.action==='delete'?'selected':'quiet'} onPress={()=>setDeleteChoices(v=>({...v,[p.id]:{action:'delete'}}))}>Permanently delete {p.name} and all shared documents</Action>
+ </Box>)}
+ <Label>Deleted profiles become unavailable to everyone immediately. File cleanup may take time; if interrupted, retry this request. Transfers and profile deletions cannot be undone here.</Label>
+ <Label variant="small">Shared records you do not delete remain with their admin. Account attribution is anonymised, but names or details typed into records and documents may remain. Copies already downloaded by others cannot be recalled. Separate “On this device” profiles and exports are not deleted.</Label>
+ <Field label="Type DELETE MY ACCOUNT to confirm" value={deleteConfirmation} onChange={setDeleteConfirmation}/>
+ <Action disabled={busy||deleteConfirmation!=='DELETE MY ACCOUNT'||deleteProfiles.some(p=>!deleteChoices[p.id])} onPress={()=>run(deleteAccount)}>{busy?'Deleting…':'Confirm permanent account deletion'}</Action>
+ {!!error&&<Label variant="error">{error}</Label>}
+ </Sheet>
  <Sheet open={modal==='share'} title="Share this inmate profile?" onClose={()=>!busy&&setModal('family')}>
  <Label>This will upload {local?.state.profile.name}’s profile details and {local?.state.entries.length||0} records to your family account. Only you and family members you invite will have access.</Label>
- <Label variant="small">Your original device profile remains as a separate copy. Changes to that copy will not sync. Attached document files cannot be shared in this version; profiles containing attachments must stay on this device.</Label>
+ <Label variant="small">Your original device profile remains as a separate copy. Changes to that copy will not sync. Existing attached files stay on this device. To share them, create a shared profile without attachments and upload the files to its Documents section.</Label>
  <Action disabled={busy||!!local?.state.entries.some(e=>e.attachment)} onPress={()=>run(async()=>{
    const state=bookRef.current!.profiles.find(p=>p.id===bookRef.current!.selectedId)!.state;
    const clean:RecordState={...state,entries:state.entries.map(({reminderId,...e})=>e)};

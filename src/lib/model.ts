@@ -11,11 +11,21 @@ function dateTime(date:string,time='12:00') {
   const value=new Date(y,m-1,d,h,n);
   return value.getFullYear()===y&&value.getMonth()===m-1&&value.getDate()===d&&h<24&&n<60 ? value : null;
 }
+function displayDate(iso:string) { return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso.split('-').reverse().join('-'):iso; }
+function inputDate(value:string) {
+  if(!/^\d{2}-\d{2}-\d{4}$/.test(value)) return '';
+  const iso=value.split('-').reverse().join('-');
+  return dateTime(iso)?iso:'';
+}
+function displayTimestamp(value:string) {
+  const d=new Date(value); if(Number.isNaN(d.getTime()))return '';
+  return displayDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)+' · '+d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'});
+}
 function validate(e:Entry) {
   if(!kinds.includes(e.kind)) return 'Choose a record category.';
   if(!e.title.trim()) return 'Enter a title.';
   if(e.title.length>200||e.details.length>10000) return 'Use a shorter title or notes.';
-  if(!dateTime(e.date,e.time||'12:00')) return 'Use a valid date (YYYY-MM-DD) and time (HH:MM, 24-hour).';
+  if(!dateTime(e.date,e.time||'12:00')) return 'Use a valid date (DD-MM-YYYY) and time (HH:MM, 24-hour).';
   if(!statuses.includes(e.status)) return 'Choose a status.';
   return '';
 }
@@ -29,4 +39,4 @@ function parse(raw:string):State {
 const sort = (items:Entry[]) => [...items].sort((a,b)=>`${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
 function next(state:State,kind:string) { return [...state.entries].filter(e=>e.kind===kind&&e.status!=='Completed'&&e.date>=today()).sort((a,b)=>`${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))[0]; }
 function sample():State { const x=empty(); x.demo=true; x.profile={name:'Demo profile',min:'Example only',location:'NSW correctional centre'}; x.entries=[{...blank('Court'),title:'Court mention',place:'Example Local Court',time:'09:30',details:'Sample record. Add the matter and solicitor details here.'},{...blank('Medical'),title:'Medication follow-up',status:'Follow up',details:'Sample concern to discuss with the treating team.'},{...blank('Visit'),title:'Family visit',time:'13:00',details:'Sample booking. Confirm approval and booking details with the centre.'}]; return x; }
-export const model={kinds,statuses,empty,blank,today,dateTime,validate,parse,sort,next,sample};
+export const model={displayDate,inputDate,displayTimestamp,kinds,statuses,empty,blank,today,dateTime,validate,parse,sort,next,sample};

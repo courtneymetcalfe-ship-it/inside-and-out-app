@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AppState, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { colors } from './UI';
-import { hasPasscode, isLockEnabled, setPasscode, verifyPasscode } from '../lib/secure';
+import {cleanOldExports} from '../lib/platform';
+import { hasPasscode, isLockEnabled, setPasscode, verifyPasscode, resetPinAttempts, PinCooldownError } from '../lib/secure';
 
 type Props = { children: React.ReactNode };
 
@@ -18,13 +19,14 @@ export default function AppLock({ children }: Props) {
 
   useEffect(() => {
     (async () => {
+      await cleanOldExports();
       const exists = await hasPasscode();
       const enabled = await isLockEnabled();
       setNeedsSetup(!exists);
       setLocked(exists && enabled);
       setReady(true);
       if (exists && enabled) void tryBiometrics();
-    })().catch(() => setError('Secure storage could not be opened. Close and reopen the app to try again.'));
+    })().catch(() => setError('Private app storage could not be prepared. Close and reopen the app to try again.'));
   }, []);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function AppLock({ children }: Props) {
         promptMessage: 'Unlock Inside & Out',
         fallbackLabel: 'Use passcode',
       });
-      if (result.success) setLocked(false);
+      if (result.success) {await resetPinAttempts();setPin('');setError('');setLocked(false);}
     } catch {}
   }
 
@@ -74,7 +76,7 @@ export default function AppLock({ children }: Props) {
       setError('');
       setLocked(false);
     } else setError('Incorrect passcode.');
-    } catch {setError('Secure storage could not be opened. Please try again.');} finally {setBusy(false);}
+    } catch(e) {setError(e instanceof PinCooldownError?e.message:'Secure storage could not be opened. Please try again.');} finally {setPin('');setBusy(false);}
   }
 
   if (!ready) return <View style={s.center}><Text>{error || 'Loading…'}</Text></View>;

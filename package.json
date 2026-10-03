@@ -16,7 +16,7 @@
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@supabase/supabase-js": "^2.116.0",
+    "@supabase/supabase-js": "2.116.0",
     "expo": "~54.0.0",
     "expo-constants": "~18.0.0",
     "expo-dev-client": "~6.0.21",
@@ -38,6 +38,9 @@
     "react-native-screens": "~4.16.0",
     "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "^0.21.2"
+  },
+  "overrides": {
+    "postcss": "8.5.28"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
