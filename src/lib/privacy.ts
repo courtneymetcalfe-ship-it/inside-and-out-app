@@ -1,5 +1,6 @@
 export const supportEmail='insideandoutapp.support@gmail.com';
-export const privacyUrl='https://github.com/courtneymetcalfe-ship-it/inside-and-out-app/blob/codex/inmate-family-access/docs/privacy.md';
+export const privacyUrl='https://github.com/courtneymetcalfe-ship-it/inside-and-out-app/blob/main/docs/privacy.md';
+export const supportUrl='https://github.com/courtneymetcalfe-ship-it/inside-and-out-app/blob/main/docs/support.md';
 export const privacyUpdated='03-10-2026';
 export const privacySections=[
  {title:'About this policy',body:'Inside & Out is a family organiser for inmate profiles, court dates, medical information, visits, calls, tasks and documents. It is not a government, correctional, legal or medical service. This policy describes how the app handles information. Contact Inside & Out at insideandoutapp.support@gmail.com with privacy questions, access or correction requests, deletion problems or complaints.'},
