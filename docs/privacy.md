@@ -16,7 +16,7 @@ You can use device profiles without a family account. These records and attachme
 
 ## Family sharing
 
-Signing into family access sends your email to our authentication service so a sign-in code can be delivered. Choosing to share a profile uploads its records to cloud storage. Files are uploaded when you select them for a shared profile. Each shared inmate has one admin. All invited members who join that profile can read its shared records and documents and update task completion. The admin manages records, uploads and access. Members can see family email addresses and activity attribution. There are no document-by-document privacy controls. Your original device profile remains a separate copy and does not synchronise with the shared profile.
+Signing into family access sends your email to our authentication service so a sign-in code can be delivered. Choosing to share a profile uploads its records to cloud storage. Files are uploaded when you select them for a shared profile. Each shared inmate has one admin. All invited members who join that profile can read its shared records and documents and update task completion. The admin manages records, uploads and access. All accepted members of a shared inmate profile can see that profile’s family activity history, including attribution to the family account email that performed the action. Members can also see family email addresses. There are no document-by-document privacy controls. Your original device profile remains a separate copy and does not synchronise with the shared profile.
 
 ## Why information is used
 
