@@ -9,7 +9,7 @@
     "scheme": "insideandout",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "au.com.insideandout.app",
       "buildNumber": "1",
       "infoPlist": {
