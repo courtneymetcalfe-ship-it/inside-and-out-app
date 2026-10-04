@@ -4,7 +4,7 @@
     "slug": "inside-and-out",
     "owner": "courtneymetcalfes-team",
     "version": "1.0.0",
-    "icon": "./assets/inside-out-door.png",
+    "icon": "./assets/inside-out-app-icon.png",
     "orientation": "portrait",
     "scheme": "insideandout",
     "userInterfaceStyle": "light",
