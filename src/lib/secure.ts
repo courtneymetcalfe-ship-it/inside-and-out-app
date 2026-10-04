@@ -6,7 +6,7 @@ const ATTEMPTS_KEY = 'insideout_pin_attempts_v1';
 const secureOptions = {keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY};
 let verificationQueue: Promise<unknown> = Promise.resolve();
 export class PinCooldownError extends Error {
-  constructor(seconds: number) {super(`Too many incorrect attempts. Try again in ${seconds} seconds, or use Face ID / Touch ID.`);}
+  constructor(seconds: number) {super(`Too many incorrect attempts. Try again in ${seconds} seconds, or use biometric unlock.`);}
 }
 export async function resetPinAttempts() {
   await SecureStore.setItemAsync(ATTEMPTS_KEY, JSON.stringify({failures:0,until:0}), secureOptions);

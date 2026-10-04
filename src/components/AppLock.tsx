@@ -83,7 +83,7 @@ export default function AppLock({ children }: Props) {
   if (!needsSetup && !locked) return <>{children}</>;
 
   return <View style={s.page}>
-    <Image source={require('../../assets/inside-out-door.png')} style={s.logo}/>
+    <Image source={require('../../assets/inside-out-app-icon.png')} style={s.logo}/>
     <Text style={s.title}>Inside & Out</Text>
     <Text style={s.subtitle}>{needsSetup ? 'Protect private family information with an app passcode.' : 'Unlock to continue.'}</Text>
     <TextInput
@@ -99,7 +99,7 @@ export default function AppLock({ children }: Props) {
     {needsSetup && <TextInput accessibilityLabel="Confirm passcode" value={confirmation} onChangeText={setConfirmation} keyboardType="number-pad" secureTextEntry maxLength={6} placeholder="Confirm passcode" style={[s.input,{marginTop:12}]} />}
     {!!error && <Text style={s.error}>{error}</Text>}
     <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={needsSetup ? setup : unlock}><Text style={s.primaryText}>{busy ? 'Please wait…' : needsSetup ? 'Create passcode' : 'Unlock'}</Text></Pressable>
-    {!needsSetup && <Pressable style={s.secondary} onPress={tryBiometrics}><Text style={s.secondaryText}>Use Face ID / Touch ID</Text></Pressable>}
+    {!needsSetup && <Pressable style={s.secondary} onPress={tryBiometrics}><Text style={s.secondaryText}>{Platform.OS==='android'?'Use fingerprint / face unlock':'Use Face ID / Touch ID'}</Text></Pressable>}
     <Text style={s.note}>Your passcode is stored in secure device storage. App Lock controls app access; keep your device protected and exported files private.</Text>
   </View>;
 }

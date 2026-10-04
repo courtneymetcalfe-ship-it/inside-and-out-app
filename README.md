@@ -21,10 +21,10 @@ npx expo start
 - Expo GitHub base directory: `/` (repository root)
 - iOS bundle identifier / Android package: `au.com.insideandout.app`
 
-The EAS configuration includes development, preview and production profiles. The Expo project must be accessed using an authorised account. Apple signing credentials and a signed iOS build are still needed before TestFlight. No build or submission is triggered automatically by this repository.
+The EAS configuration includes development, preview, production and Android preview profiles. The Expo project must be accessed using an authorised account. The manual **Build and Submit iOS** workflow produces an iPhone build and submits it to TestFlight using the project's configured credentials. The manual **Build Android** workflow produces an installable APK; production Android builds produce a Google Play AAB. See [Android build instructions](docs/android-release.md). These workflows do not run automatically on every source change.
 
 ## Current limits
 
-There are no user accounts, family roles, cloud sync, official service feeds or AI chat. App lock gates access but does not separately encrypt organiser records or exports. JSON exports do not contain attached document bytes, and backup restore is not implemented.
+Device profiles remain local. Optional Family access supports email sign-in, shared inmate profiles and invitations with one admin per inmate; see [Family sharing](FAMILY-SHARING.md). There are no official service feeds or AI chat. App lock gates access but does not separately encrypt organiser records or exports. JSON exports do not contain attached document bytes, and backup restore is not implemented.
 
-TypeScript and six model tests passed during source preparation. JavaScript bundle export was also checked; this is not an installable native build. Physical-device testing, final branding, privacy/support pages and store preparation remain required before release.
+Run TypeScript and the full test suite before release. A successful bundle export or Android native-project generation is not an installable signed build. Physical-device testing and store preparation remain required before release.

@@ -19,7 +19,13 @@
     },
     "android": {
       "package": "au.com.insideandout.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "icon": "./assets/inside-out-app-icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/inside-out-app-icon.png",
+        "backgroundColor": "#174F4B"
+      },
+      "softwareKeyboardLayoutMode": "resize"
     },
     "plugins": [
       "expo-router",

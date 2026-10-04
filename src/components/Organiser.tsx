@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {AppState,Image,ImageBackground,Pressable,StyleSheet,Text,View} from 'react-native';
+import {AppState,BackHandler,Image,ImageBackground,Platform,Pressable,StyleSheet,Text,View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {model} from '../lib/model';
 import {platform} from '../lib/platform';
@@ -48,6 +48,11 @@ function Records({initialPage,source,toolbar}:{initialPage:string;source:RecordS
   const [profile,setProfile]=useState<State['profile']|null>(null);const [confirm,setConfirm]=useState<'clear'|Entry|null>(null);
   const [topic,setTopic]=useState('');
   const [editDate,setEditDate]=useState('');
+  useEffect(()=>{
+    if(Platform.OS!=='android'||page==='Home')return;
+    const listener=BackHandler.addEventListener('hardwareBackPress',()=>{go('Home');return true;});
+    return()=>listener.remove();
+  },[page]);
   useEffect(()=>{setEditDate(edit?model.displayDate(edit.date):'');},[edit?.id]);
   useEffect(()=>{let active=true;source.load().then(s=>{if(active){current.current=s;setState(s);setReady(true);}}).catch(e=>{if(active)setError('Unable to load saved records: '+e.message);});return()=>{active=false;};},[]);
   useEffect(()=>{
@@ -81,7 +86,7 @@ function Records({initialPage,source,toolbar}:{initialPage:string;source:RecordS
   return <Shell nav={nav}>
     <View style={ui.header}>
       <View style={ui.brandRow}>
-        <Image source={require('../../assets/inside-out-door.png')} style={ui.logo}/>
+        <Image source={require('../../assets/inside-out-app-icon.png')} style={ui.logo}/>
         <View style={ui.brandCopy}><Text style={ui.brand}>{page==='Home'?'Inside & Out':pageTitles[page]||page}</Text><Text style={ui.tagline}>{page==='Home'?'Organise · Stay informed · Feel supported':'Your family organiser'}</Text></View>
       </View>
       <Pressable disabled={!source.admin||busy} accessibilityRole="button" accessibilityLabel="Profile settings" style={ui.profileButton} onPress={()=>setProfile({...state.profile})}><MaterialCommunityIcons name="cog-outline" size={22} color="#174F4B"/></Pressable>
