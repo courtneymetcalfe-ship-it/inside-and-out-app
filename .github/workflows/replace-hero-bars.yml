@@ -1,0 +1,30 @@
+name: Replace hero with reference bars
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/replace-hero-bars.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download reference-style hero
+        run: |
+          curl --fail --location --retry 3 \
+            'https://032881ac-ff27-403c-b920-65e9fa3083c1.sandbox.floot.app/_cdn/static/e9c5d4f6-69b0-41fe-9629-529b67dad537-inside-out-hero-bars-style.jpg' \
+            --output assets/inside-out-hero-gate.jpg
+          test "$(wc -c < assets/inside-out-hero-gate.jpg)" -gt 70000
+      - name: Commit hero replacement
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/inside-out-hero-gate.jpg
+          git commit -m 'Use reference-style jail bars hero'
+          git push
