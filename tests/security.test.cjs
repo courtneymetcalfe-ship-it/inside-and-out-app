@@ -25,6 +25,23 @@ test('PIN delays persist across restart, increase, and reset after successful un
  assert.equal(await secure.verifyPasscode('000000'),false);
  assert.equal(JSON.parse(h.data.get('insideout_pin_attempts_v1')).failures,1);
 });
+test('a new six-digit passcode can be confirmed and unlocked after restarting',async()=>{
+ const h=pinHarness();let secure=h.reload();
+ await assert.rejects(secure.setPasscode('12345'),/six digits/);
+ await assert.rejects(secure.setPasscode('12345a'),/six digits/);
+ assert.equal(await secure.hasPasscode(),false);
+ await secure.setPasscode('654321');
+ assert.equal(await secure.hasPasscode(),true);
+ assert.equal(await secure.verifyPasscode('654321'),true);
+ secure=h.reload();
+ assert.equal(await secure.verifyPasscode('654321'),true);
+ assert.equal(await secure.verifyPasscode('123456'),false);
+});
+test('failed passcode writes never falsely report a successful setup',async()=>{
+ const h=pinHarness();let secure=h.reload();h.failWrites();
+ await assert.rejects(secure.setPasscode('654321'),/Locked keychain/);
+ assert.equal(await secure.hasPasscode(),false);
+});
 test('concurrent PIN attempts cannot bypass the persisted limit',async()=>{
  const h=pinHarness(),secure=h.reload();await secure.setPasscode('123456');
  const results=await Promise.allSettled(Array.from({length:20},()=>secure.verifyPasscode('000000')));
