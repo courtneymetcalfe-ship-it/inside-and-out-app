@@ -17,11 +17,14 @@ export async function hasPasscode() {
 }
 
 export async function setPasscode(passcode: string) {
-  await SecureStore.setItemAsync(PASSCODE_KEY, passcode, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
-  await SecureStore.setItemAsync(LOCK_ENABLED_KEY, 'true');
+  if (!/^\d{6}$/.test(passcode)) throw new Error('Passcode must contain exactly six digits.');
+  // Write the passcode last so an interrupted setup will not look complete.
+  await SecureStore.setItemAsync(LOCK_ENABLED_KEY, 'true', secureOptions);
   await resetPinAttempts();
+  await SecureStore.setItemAsync(PASSCODE_KEY, passcode, secureOptions);
+  if (await SecureStore.getItemAsync(PASSCODE_KEY) !== passcode) {
+    throw new Error('Passcode was not saved correctly.');
+  }
 }
 
 export async function verifyPasscode(passcode: string) {
