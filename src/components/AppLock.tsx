@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { colors } from './UI';
 import {cleanOldExports} from '../lib/platform';
@@ -13,20 +13,22 @@ export default function AppLock({ children }: Props) {
   const [locked, setLocked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [pin, setPin] = useState('');
-  const [confirmation, setConfirmation] = useState('');
+  const [pendingPin, setPendingPin] = useState('');
+  const [setupStep, setSetupStep] = useState<'create' | 'confirm'>('create');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     (async () => {
-      await cleanOldExports();
+      // Export cleanup is maintenance, not a prerequisite for unlocking.
+      await cleanOldExports().catch(() => {});
       const exists = await hasPasscode();
       const enabled = await isLockEnabled();
       setNeedsSetup(!exists);
       setLocked(exists && enabled);
       setReady(true);
       if (exists && enabled) void tryBiometrics();
-    })().catch(() => setError('Private app storage could not be prepared. Close and reopen the app to try again.'));
+    })().catch(() => {setLocked(true);setReady(true);setError('Secure storage is unavailable. Close and reopen the app to try again.');});
   }, []);
 
   useEffect(() => {
@@ -55,17 +57,37 @@ export default function AppLock({ children }: Props) {
   async function setup() {
     if (busy) return;
     if (!/^\d{6}$/.test(pin)) {
-      setError('Choose a 6-digit passcode.');
+      setError('Enter exactly six numbers.');
       return;
     }
-    if(pin!==confirmation){setError('The passcodes do not match.');return;}
+    if (setupStep === 'create') {
+      setPendingPin(pin);
+      setPin('');
+      setError('');
+      setSetupStep('confirm');
+      return;
+    }
+    if (pin !== pendingPin) {
+      setPin('');
+      setError('Those passcodes do not match. Re-enter the six numbers you chose, or start over.');
+      return;
+    }
     setBusy(true);
-    try { await setPasscode(pin);
-    setPin('');
-    setConfirmation('');
-    setNeedsSetup(false);
-    setLocked(false);
-    } catch {setError('The passcode could not be saved. Please try again.');} finally {setBusy(false);}
+    try {
+      await setPasscode(pin);
+      // Read it back through the same verification path used to unlock.
+      if (!await verifyPasscode(pin)) throw new Error('Stored passcode could not be verified.');
+      setPin('');
+      setPendingPin('');
+      setSetupStep('create');
+      setError('');
+      setNeedsSetup(false);
+      setLocked(false);
+    } catch {
+      setError('Could not verify the saved passcode. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function unlock() {
@@ -82,30 +104,37 @@ export default function AppLock({ children }: Props) {
   if (!ready) return <View style={s.center}><Text>{error || 'Loading…'}</Text></View>;
   if (!needsSetup && !locked) return <>{children}</>;
 
-  return <View style={s.page}>
-    <Image source={require('../../assets/inside-out-app-icon.png')} style={s.logo}/>
-    <Text style={s.title}>Inside & Out</Text>
-    <Text style={s.subtitle}>{needsSetup ? 'Protect private family information with an app passcode.' : 'Unlock to continue.'}</Text>
-    <TextInput
-      value={pin}
-      onChangeText={setPin}
-      keyboardType="number-pad"
-      secureTextEntry
-      maxLength={6}
-      placeholder="Passcode"
-      style={s.input}
-      textContentType="password"
-    />
-    {needsSetup && <TextInput accessibilityLabel="Confirm passcode" value={confirmation} onChangeText={setConfirmation} keyboardType="number-pad" secureTextEntry maxLength={6} placeholder="Confirm passcode" style={[s.input,{marginTop:12}]} />}
-    {!!error && <Text style={s.error}>{error}</Text>}
-    <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={needsSetup ? setup : unlock}><Text style={s.primaryText}>{busy ? 'Please wait…' : needsSetup ? 'Create passcode' : 'Unlock'}</Text></Pressable>
-    {!needsSetup && <Pressable style={s.secondary} onPress={tryBiometrics}><Text style={s.secondaryText}>{Platform.OS==='android'?'Use fingerprint / face unlock':'Use Face ID / Touch ID'}</Text></Pressable>}
-    <Text style={s.note}>Your passcode is stored in secure device storage. App Lock controls app access; keep your device protected and exported files private.</Text>
-  </View>;
+  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+      <Image source={require('../../assets/inside-out-app-icon.png')} style={s.logo}/>
+      <Text style={s.title}>Inside & Out</Text>
+      <Text style={s.subtitle}>{needsSetup ? (setupStep === 'create' ? 'Choose a six-digit passcode to protect your private family information.' : 'Confirm your passcode by entering the same six numbers again.') : 'Unlock to continue.'}</Text>
+      <TextInput
+        accessibilityLabel={needsSetup ? (setupStep === 'create' ? 'Choose six-digit passcode' : 'Confirm six-digit passcode') : 'Enter passcode'}
+        value={pin}
+        onChangeText={value => {setPin(value.replace(/\D/g, '').slice(0, 6));setError('');}}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={6}
+        placeholder={needsSetup ? (setupStep === 'create' ? 'New passcode' : 'Confirm passcode') : 'Passcode'}
+        style={s.input}
+        textContentType="none"
+        autoComplete="off"
+        autoCorrect={false}
+        importantForAutofill="no"
+      />
+      {!!error && <Text style={s.error}>{error}</Text>}
+      <Pressable accessibilityRole="button" disabled={busy || pin.length !== 6} style={[s.primary, (busy || pin.length !== 6) && {opacity:0.55}]} onPress={needsSetup ? setup : unlock}><Text style={s.primaryText}>{busy ? 'Please wait…' : needsSetup ? (setupStep === 'create' ? 'Continue' : 'Verify & create passcode') : 'Unlock'}</Text></Pressable>
+      {needsSetup && setupStep === 'confirm' && <Pressable accessibilityRole="button" style={s.secondary} onPress={() => {setPendingPin('');setPin('');setSetupStep('create');setError('');}}><Text style={s.secondaryText}>Start over with a different passcode</Text></Pressable>}
+      {!needsSetup && <Pressable accessibilityRole="button" style={s.secondary} onPress={tryBiometrics}><Text style={s.secondaryText}>{Platform.OS === 'android' ? 'Use fingerprint / face unlock' : 'Use Face ID / Touch ID'}</Text></Pressable>}
+      <Text style={s.note}>Your passcode is stored in secure device storage. App Lock controls app access; keep your device protected and exported files private.</Text>
+    </ScrollView>
+  </KeyboardAvoidingView>;
 }
 
 const s = StyleSheet.create({
-  page:{flex:1,backgroundColor:colors.soft,justifyContent:'center',padding:28},
+  page:{flex:1,backgroundColor:colors.soft},
+  content:{flexGrow:1,justifyContent:'center',padding:28},
   center:{flex:1,justifyContent:'center',alignItems:'center'},
   logo:{width:74,height:74,borderRadius:22,alignSelf:'center',marginBottom:18},
   title:{fontFamily:'Georgia',fontSize:30,fontWeight:'700',textAlign:'center',color:colors.navy},
